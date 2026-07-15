@@ -89,11 +89,14 @@
   </header>
 
   <textarea id="ticket" placeholder="Paste the whole ticket here — RO text, tech story, punch time, parts, VIN, mileage… the more you paste, the better the review."></textarea>
+  <input type="file" id="files" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple style="display:none">
   <div class="bar">
     <button id="go" class="primary">Review ticket</button>
+    <button id="attach">📎 Attach hard card</button>
     <button id="clear">Clear</button>
-    <span class="hint">Nothing is saved — the ticket is only used for this review.</span>
+    <span class="hint">Photos or PDF of the physical RO hard card (punches, initials, signatures). Nothing is saved.</span>
   </div>
+  <div id="filelist" class="bar" style="margin-top:-14px"></div>
 
   <div id="err" class="error"></div>
 
@@ -148,6 +151,33 @@ const SEVLBL = { critical: "✖ CRITICAL", serious: "⚠ SERIOUS", warning: "⚠
 
 function esc(s){ return String(s ?? "").replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"}[c])); }
 
+// --- hard-card attachments ---
+let attached = []; // {name, type, data(base64)}
+const MAXF = 4, MAXMB = 10;
+$("attach").addEventListener("click", () => $("files").click());
+$("files").addEventListener("change", async (e) => {
+  for (const f of e.target.files){
+    if (attached.length >= MAXF){ alert("Max " + MAXF + " files per review."); break; }
+    if (f.size > MAXMB * 1024 * 1024){ alert(f.name + " is over " + MAXMB + "MB — take a smaller photo."); continue; }
+    const data = await new Promise((res, rej) => {
+      const rd = new FileReader();
+      rd.onload = () => res(String(rd.result).split(",")[1]);
+      rd.onerror = rej;
+      rd.readAsDataURL(f);
+    });
+    attached.push({ name: f.name, type: f.type, data });
+  }
+  e.target.value = "";
+  renderFiles();
+});
+function renderFiles(){
+  $("filelist").innerHTML = attached.map((f, i) =>
+    `<button type="button" class="copy" data-i="${i}" title="Click to remove">📄 ${esc(f.name)} ✕</button>`).join("");
+  [...$("filelist").querySelectorAll("button")].forEach(b => b.addEventListener("click", () => {
+    attached.splice(Number(b.dataset.i), 1); renderFiles();
+  }));
+}
+
 $("go").addEventListener("click", async () => {
   const ticket = $("ticket").value.trim();
   const err = $("err");
@@ -160,7 +190,7 @@ $("go").addEventListener("click", async () => {
     const r = await fetch("/api/review", {
       method: "POST",
       headers: {"content-type":"application/json"},
-      body: JSON.stringify({ ticket })
+      body: JSON.stringify({ ticket, files: attached })
     });
     if (r.status === 401){ location.href = "/"; return; }
     const data = await r.json();
@@ -178,6 +208,7 @@ $("go").addEventListener("click", async () => {
 
 $("clear").addEventListener("click", () => {
   $("ticket").value = "";
+  attached = []; renderFiles();
   $("results").style.display = "none";
   $("err").style.display = "none";
 });
