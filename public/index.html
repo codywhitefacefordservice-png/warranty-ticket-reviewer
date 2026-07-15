@@ -1,0 +1,219 @@
+🔧——…—–📋🚩✍️—❓—✔⚠✖✔✖✖⚠⚠…—<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Warranty Ticket Reviewer</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --border:rgba(11,11,11,.10); --accent:#2a78d6;
+    --good:#0ca30c; --good-ink:#006300; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+           --grid:#2c2c2a; --border:rgba(255,255,255,.10); --accent:#3987e5;
+           --good:#0ca30c; --good-ink:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+       font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:24px 16px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  h1{font-size:22px;margin:0}
+  h2{font-size:15px;margin:0 0 10px}
+  .sub{color:var(--ink-2);font-size:13px}
+  a{color:var(--accent)}
+  textarea{width:100%;min-height:220px;padding:14px;font:13.5px/1.5 ui-monospace,Consolas,monospace;
+           border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--ink);resize:vertical}
+  textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .bar{display:flex;gap:10px;align-items:center;margin:12px 0 24px;flex-wrap:wrap}
+  button{padding:10px 18px;font-size:15px;font-weight:600;border:1px solid var(--border);
+         border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
+  button.primary{background:var(--accent);border-color:transparent;color:#fff}
+  button:hover{filter:brightness(1.05)}
+  button:disabled{opacity:.55;cursor:wait}
+  .hint{color:var(--muted);font-size:13px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+  #results{display:none}
+  .verdict{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .scorewrap{display:flex;align-items:center;gap:14px}
+  .score{font-size:40px;font-weight:700;line-height:1}
+  .score small{font-size:15px;font-weight:500;color:var(--muted)}
+  .vpill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-weight:700;font-size:13.5px}
+  .v-ready{color:var(--good-ink);background:rgba(12,163,12,.12)}
+  .v-needs_work{color:#8a5a00;background:rgba(250,178,25,.18)}
+  .v-high_risk{color:var(--critical);background:rgba(208,59,59,.12)}
+  @media (prefers-color-scheme: dark){ .v-needs_work{color:var(--warning)} .v-high_risk{color:#e66767} }
+  .summary{margin:10px 0 0;color:var(--ink-2)}
+  ul.checklist{list-style:none;margin:0;padding:0}
+  ul.checklist li{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--grid);align-items:baseline}
+  ul.checklist li:last-child{border-bottom:0}
+  .st{flex:0 0 92px;font-weight:700;font-size:12.5px;white-space:nowrap}
+  .st.ok{color:var(--good-ink)} .st.missing{color:var(--critical)} .st.unclear{color:#8a5a00}
+  @media (prefers-color-scheme: dark){ .st.unclear{color:var(--warning)} }
+  .ci{font-weight:600}
+  .cn{color:var(--ink-2);font-size:13.5px}
+  .risk{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--grid)}
+  .risk:last-child{border-bottom:0}
+  .sev{flex:0 0 96px;font-weight:700;font-size:12.5px;white-space:nowrap}
+  .sev.critical{color:var(--critical)} .sev.serious{color:var(--serious)} .sev.warning{color:#8a5a00}
+  @media (prefers-color-scheme: dark){ .sev.warning{color:var(--warning)} }
+  .rf{font-weight:600}
+  .rd{color:var(--ink-2);font-size:13.5px}
+  .rw{margin:0 0 12px}
+  .rw:last-child{margin:0}
+  .rw .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center}
+  .rw .t{background:var(--page);border:1px solid var(--grid);border-radius:8px;padding:10px 12px;margin-top:4px;font-size:14px;white-space:pre-wrap}
+  .copy{font-size:12px;padding:2px 10px;font-weight:600}
+  ul.qs{margin:0;padding-left:20px;color:var(--ink-2)}
+  ul.qs li{margin:4px 0}
+  .error{display:none;color:var(--critical);background:rgba(208,59,59,.08);border:1px solid rgba(208,59,59,.25);
+         border-radius:8px;padding:10px 14px;margin-bottom:14px}
+  footer{margin-top:22px;color:var(--muted);font-size:12.5px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+        border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>🔧 Warranty Ticket Reviewer</h1>
+      <div class="sub">Paste the warranty repair order — get a completeness check, risk flags, and a claim-ready write-up.</div>
+    </div>
+    <div class="sub"><a href="/logout">Sign out</a></div>
+  </header>
+
+  <textarea id="ticket" placeholder="Paste the whole ticket here — RO text, tech story, punch time, parts, VIN, mileage… the more you paste, the better the review."></textarea>
+  <div class="bar">
+    <button id="go" class="primary">Review ticket</button>
+    <button id="clear">Clear</button>
+    <span class="hint">Nothing is saved — the ticket is only used for this review.</span>
+  </div>
+
+  <div id="err" class="error"></div>
+
+  <div id="results">
+    <div class="card verdict">
+      <div class="scorewrap">
+        <div class="score" id="r-score">–<small>/100</small></div>
+        <span class="vpill" id="r-verdict"></span>
+      </div>
+      <p class="summary" id="r-summary" style="flex:1;min-width:240px"></p>
+    </div>
+
+    <div class="card">
+      <h2>📋 Documentation completeness</h2>
+      <ul class="checklist" id="r-check"></ul>
+    </div>
+
+    <div class="card" id="riskcard">
+      <h2>🚩 Rejection & audit risks</h2>
+      <div id="r-risks"></div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ Claim-ready write-up</h2>
+      <div class="rw"><div class="k"><span>Complaint</span><button class="copy" data-t="complaint">Copy</button></div><div class="t" id="rw-complaint"></div></div>
+      <div class="rw"><div class="k"><span>Cause</span><button class="copy" data-t="cause">Copy</button></div><div class="t" id="rw-cause"></div></div>
+      <div class="rw"><div class="k"><span>Correction</span><button class="copy" data-t="correction">Copy</button></div><div class="t" id="rw-correction"></div></div>
+      <div class="hint" style="margin-top:8px">Bracketed items like [ADD PUNCH TIME] are facts the AI wouldn't invent — fill them in from the RO.</div>
+    </div>
+
+    <div class="card" id="qcard">
+      <h2>❓ Answer before you submit</h2>
+      <ul class="qs" id="r-questions"></ul>
+    </div>
+  </div>
+
+  <footer>AI-assisted review — a second set of eyes, not official Ford guidance. The advisor is responsible for the final claim.</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const VLABEL = { ready: "✔ Looks claim-ready", needs_work: "⚠ Needs work", high_risk: "✖ High risk" };
+const SLABEL = { ok: "✔ OK", missing: "✖ MISSING", unclear: "? UNCLEAR" };
+const SEVLBL = { critical: "✖ CRITICAL", serious: "⚠ SERIOUS", warning: "⚠ WARNING" };
+
+function esc(s){ return String(s ?? "").replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"}[c])); }
+
+$("go").addEventListener("click", async () => {
+  const ticket = $("ticket").value.trim();
+  const err = $("err");
+  err.style.display = "none";
+  if (!ticket){ err.textContent = "Paste a ticket first."; err.style.display = "block"; return; }
+  const btn = $("go");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Reviewing…';
+  try{
+    const r = await fetch("/api/review", {
+      method: "POST",
+      headers: {"content-type":"application/json"},
+      body: JSON.stringify({ ticket })
+    });
+    if (r.status === 401){ location.href = "/"; return; }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Review failed");
+    show(data.review);
+  }catch(e){
+    err.textContent = "Review failed: " + e.message;
+    err.style.display = "block";
+  }finally{
+    btn.disabled = false;
+    btn.textContent = "Review ticket";
+  }
+});
+
+$("clear").addEventListener("click", () => {
+  $("ticket").value = "";
+  $("results").style.display = "none";
+  $("err").style.display = "none";
+});
+
+function show(rv){
+  $("r-score").innerHTML = esc(rv.score) + "<small>/100</small>";
+  const v = String(rv.verdict || "needs_work");
+  const vp = $("r-verdict");
+  vp.className = "vpill v-" + v;
+  vp.textContent = VLABEL[v] || v;
+  $("r-summary").textContent = rv.summary || "";
+
+  $("r-check").innerHTML = (rv.completeness || []).map(c => {
+    const st = String(c.status || "unclear");
+    return `<li><span class="st ${st}">${SLABEL[st] || esc(st)}</span>
+      <span><span class="ci">${esc(c.item)}</span> — <span class="cn">${esc(c.note)}</span></span></li>`;
+  }).join("");
+
+  const risks = rv.risks || [];
+  $("riskcard").style.display = risks.length ? "" : "none";
+  $("r-risks").innerHTML = risks.map(r => {
+    const sv = String(r.severity || "warning");
+    return `<div class="risk"><span class="sev ${sv}">${SEVLBL[sv] || esc(sv)}</span>
+      <span><span class="rf">${esc(r.flag)}</span><div class="rd">${esc(r.detail)}</div></span></div>`;
+  }).join("");
+
+  $("rw-complaint").textContent = rv.rewrite?.complaint || "";
+  $("rw-cause").textContent = rv.rewrite?.cause || "";
+  $("rw-correction").textContent = rv.rewrite?.correction || "";
+
+  const qs = rv.questions || [];
+  $("qcard").style.display = qs.length ? "" : "none";
+  $("r-questions").innerHTML = qs.map(q => "<li>" + esc(q) + "</li>").join("");
+
+  $("results").style.display = "block";
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+document.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
+  const txt = $("rw-" + b.dataset.t).textContent;
+  try{ await navigator.clipboard.writeText(txt); b.textContent = "Copied!"; }
+  catch{ b.textContent = "Select & copy"; }
+  setTimeout(() => b.textContent = "Copy", 1500);
+}));
+</script>
+</body>
+</html>
