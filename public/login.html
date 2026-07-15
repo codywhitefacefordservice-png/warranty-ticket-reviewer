@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Warranty Ticket Reviewer — Sign in</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e;
+    --border:rgba(11,11,11,.10); --accent:#2a78d6; --bad:#d03b3b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7;
+           --border:rgba(255,255,255,.10); --accent:#3987e5; --bad:#e66767; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--page);
+       font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+        padding:32px;width:min(92vw,400px);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  h1{font-size:20px;margin:0 0 4px}
+  p{margin:0 0 20px;color:var(--ink-2);font-size:14px}
+  input{width:100%;padding:10px 12px;font-size:16px;border:1px solid var(--border);
+        border-radius:8px;background:var(--page);color:var(--ink)}
+  input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  button{margin-top:14px;width:100%;padding:10px;font-size:15px;font-weight:600;border:0;
+         border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+  button:hover{filter:brightness(1.08)}
+  .msg{color:var(--bad);font-size:14px;min-height:20px;margin:10px 0 0}
+</style>
+</head>
+<body>
+  <form class="card" method="post" action="/login">
+    <h1>🔧 Warranty Ticket Reviewer</h1>
+    <p>AI review of warranty repair-order documentation before the claim goes in. Enter your access code to continue.</p>
+    <input type="password" name="code" placeholder="Access code" autofocus autocomplete="current-password" required>
+    <div class="msg"><!--MSG--></div>
+    <button type="submit">Enter</button>
+  </form>
+</body>
+</html>
