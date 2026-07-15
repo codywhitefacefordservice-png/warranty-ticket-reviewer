@@ -99,9 +99,9 @@ Review the ticket text the user provides and respond with ONLY a JSON object (no
     {"severity": "critical" | "serious" | "warning", "flag": "short title", "detail": "why this could get the claim rejected or flagged in an audit, and what to do about it"}
   ],
   "rewrite": {
-    "complaint": "claim-ready Complaint line based only on facts present in the ticket",
-    "cause": "claim-ready Cause statement",
-    "correction": "claim-ready Correction statement"
+    "complaint": "claim-ready Complaint line based only on facts present in the ticket, IN ALL CAPS",
+    "cause": "claim-ready Cause statement, IN ALL CAPS",
+    "correction": "claim-ready Correction statement, IN ALL CAPS"
   },
   "questions": ["anything the tech/advisor should answer or add before submitting, as short direct questions"]
 }
@@ -224,8 +224,18 @@ function fileBlocks(files) {
   return blocks;
 }
 
+// RO style: the claim-ready write-up is always ALL CAPS
+function upcaseRewrite(out) {
+  if (out && out.rewrite) {
+    for (const k of ["complaint", "cause", "correction"]) {
+      if (out.rewrite[k]) out.rewrite[k] = String(out.rewrite[k]).toUpperCase();
+    }
+  }
+  return out;
+}
+
 async function reviewTicket(ticket, recallInfo, files) {
-  if (MOCK) return MOCK_REVIEW;
+  if (MOCK) return upcaseRewrite(MOCK_REVIEW);
   const blocks = fileBlocks(files);
   const intro = blocks.length
     ? "Attached above: " + blocks.length + " file(s) showing the physical repair-order hard card (time punches, initials, signatures). Cross-check them against the typed ticket below.\n\n"
@@ -256,7 +266,7 @@ async function reviewTicket(ticket, recallInfo, files) {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1) throw new Error("The AI returned an unexpected format. Try again.");
-  return JSON.parse(text.slice(start, end + 1));
+  return upcaseRewrite(JSON.parse(text.slice(start, end + 1)));
 }
 
 // ---------------------------------------------------------------------------
