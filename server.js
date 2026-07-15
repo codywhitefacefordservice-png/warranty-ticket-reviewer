@@ -111,7 +111,8 @@ Rules:
 - "Found bad, replaced"-style causes, missing diagnosis, wear/maintenance items claimed as warranty, aftermarket-part involvement, time far over the labor op, and story inconsistencies are the classic rejection triggers - call them out.
 - Be direct and practical, like a warranty admin who wants the claim to get PAID, not a lecture.
 - Never question or flag the calendar dates on the ticket as implausible or "in the future" - assume the ticket's dates are current. Only flag dates for internal inconsistency (e.g. date out before date in, disclosure before repair).
-- If the pasted text is not a warranty ticket at all, say so in "summary", set score to 0 and verdict to "high_risk", and leave the arrays sensible but short.` +
+- If the pasted text is not a warranty ticket at all, say so in "summary", set score to 0 and verdict to "high_risk", and leave the arrays sensible but short.
+- If images or PDFs of the physical repair-order HARD CARD are attached: the hard copy is the OFFICIAL record of the repair (per 1.2.01). Read them carefully and cross-check against the typed ticket. Verify: time punches present (start AND finish for each actual-time repair, per 1.3.04); add-on repairs initialed by service management on the same line with "ADD" in the labor op column (per 1.2.04); required signatures/authorizations present (customer signature or management authorization for dealer vehicles - rubber stamps not acceptable); handwritten tech comments and test results; and that the hard card matches the typed story (mileage, dates, parts, hours). Add completeness entries for "Hard card: time punches", "Hard card: signatures/authorizations", and "Hard card vs ticket consistency". Flag ANY discrepancy between hard card and typed claim as serious or critical - hard-card mismatches are classic audit findings. If an attached file is unreadable or isn't a repair order, say so in a completeness note.` +
   (FORD_REFERENCE
     ? `\n\nYou also have the dealership's distilled Ford Warranty & Policy Manual reference below. Apply these ACTUAL Ford rules when reviewing: check coverage periods against the vehicle's age/mileage, flag missing prior approvals, missing required test readings, time-limit problems, and exclusions. When a finding is based on a specific rule, cite the manual section number (e.g. "per 1.3.04") in the note or detail so the advisor can look it up.\n\n=== FORD WARRANTY & POLICY REFERENCE ===\n` + FORD_REFERENCE
     : "");
@@ -206,8 +207,33 @@ function recallContext(info) {
   return s;
 }
 
-async function reviewTicket(ticket, recallInfo) {
+// Attached hard-card files -> Claude API content blocks
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+function fileBlocks(files) {
+  const blocks = [];
+  for (const f of (files || []).slice(0, 4)) {
+    const type = String(f.type || "");
+    const data = String(f.data || "");
+    if (!data || data.length > 14_000_000) continue; // ~10MB decoded cap per file
+    if (IMAGE_TYPES.includes(type)) {
+      blocks.push({ type: "image", source: { type: "base64", media_type: type, data } });
+    } else if (type === "application/pdf") {
+      blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data } });
+    }
+  }
+  return blocks;
+}
+
+async function reviewTicket(ticket, recallInfo, files) {
   if (MOCK) return MOCK_REVIEW;
+  const blocks = fileBlocks(files);
+  const intro = blocks.length
+    ? "Attached above: " + blocks.length + " file(s) showing the physical repair-order hard card (time punches, initials, signatures). Cross-check them against the typed ticket below.\n\n"
+    : "";
+  const content = [
+    ...blocks,
+    { type: "text", text: intro + "Review this warranty ticket:\n\n" + ticket + recallContext(recallInfo) },
+  ];
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -217,9 +243,9 @@ async function reviewTicket(ticket, recallInfo) {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-5",
-      max_tokens: 2500,
+      max_tokens: 4000,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: "Review this warranty ticket:\n\n" + ticket + recallContext(recallInfo) }],
+      messages: [{ role: "user", content }],
     }),
   });
   const data = await r.json();
@@ -237,7 +263,7 @@ async function reviewTicket(ticket, recallInfo) {
 // App
 // ---------------------------------------------------------------------------
 const app = express();
-app.use(express.json({ limit: "200kb" }));
+app.use(express.json({ limit: "45mb" }));
 app.use(express.urlencoded({ extended: false }));
 
 const LOGIN_PAGE = fs.readFileSync(path.join(__dirname, "public", "login.html"), "utf8");
@@ -284,10 +310,11 @@ app.post("/api/review", async (req, res) => {
   const ticket = String(req.body.ticket || "").trim();
   if (!ticket) return res.status(400).json({ error: "Paste a ticket first." });
   if (ticket.length > 60000) return res.status(400).json({ error: "That ticket is too long — trim it down." });
+  const files = Array.isArray(req.body.files) ? req.body.files : [];
   try {
     const vin = extractVin(ticket);
     const recallInfo = vin ? await lookupRecalls(vin) : null;
-    const review = await reviewTicket(ticket, recallInfo);
+    const review = await reviewTicket(ticket, recallInfo, files);
     res.json({ review, recallInfo });
   } catch (e) {
     res.status(502).json({ error: e.message });
