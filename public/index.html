@@ -116,6 +116,13 @@
       <div id="r-risks"></div>
     </div>
 
+    <div class="card" id="recallcard" style="display:none">
+      <h2>📢 Recalls on file (NHTSA)</h2>
+      <div class="sub" id="recall-veh" style="margin-bottom:8px"></div>
+      <div id="r-recalls"></div>
+      <div class="hint" style="margin-top:8px">Campaigns listed for this year/make/model from the federal NHTSA database. Check OASIS to confirm which are still open on this VIN. Recalls are claimed as recalls — never coded as warranty.</div>
+    </div>
+
     <div class="card">
       <h2>✍️ Claim-ready write-up</h2>
       <div class="rw"><div class="k"><span>Complaint</span><button class="copy" data-t="complaint">Copy</button></div><div class="t" id="rw-complaint"></div></div>
@@ -159,6 +166,7 @@ $("go").addEventListener("click", async () => {
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Review failed");
     show(data.review);
+    showRecalls(data.recallInfo);
   }catch(e){
     err.textContent = "Review failed: " + e.message;
     err.style.display = "block";
@@ -206,6 +214,26 @@ function show(rv){
 
   $("results").style.display = "block";
   $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function showRecalls(info){
+  const card = $("recallcard");
+  if (!info){ card.style.display = "none"; return; }
+  card.style.display = "block";
+  if (info.error){
+    $("recall-veh").textContent = "VIN " + (info.vin || "") + " — lookup unavailable: " + info.error;
+    $("r-recalls").innerHTML = "";
+    return;
+  }
+  $("recall-veh").textContent = "VIN " + info.vin + " → " + info.year + " " + info.make + " " + info.model;
+  const list = info.recalls || [];
+  if (!list.length){
+    $("r-recalls").innerHTML = '<div class="cn">No recall campaigns on file at NHTSA for this year/make/model.</div>';
+    return;
+  }
+  $("r-recalls").innerHTML = list.map(r => `
+    <div class="risk"><span class="sev warning">📢 ${esc(r.campaign)}</span>
+      <span><span class="rf">${esc(r.component)}</span><div class="rd">${esc(r.summary)}${r.remedy ? "<br><em>Remedy:</em> " + esc(r.remedy) : ""}</div></span></div>`).join("");
 }
 
 document.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
