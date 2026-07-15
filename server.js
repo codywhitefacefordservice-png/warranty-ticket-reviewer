@@ -41,7 +41,7 @@ function isAuthed(req) {
     return (
       val.length === AUTH_TOKEN.length &&
       crypto.timingSafeEqual(Buffer.from(val), Buffer.from(AUTH_TOKEN))
-      );
+    );
   } catch {
     return false;
   }
@@ -60,6 +60,27 @@ function tooManyAttempts(ip) {
 }
 
 // ---------------------------------------------------------------------------
+// Optional distilled Ford Warranty & Policy reference. Loaded from (in order):
+// REFERENCE_FILE env var, Render secret file, or a local ford_reference.md.
+// Kept OUT of the public repo — deploy it as a Render Secret File.
+// ---------------------------------------------------------------------------
+let FORD_REFERENCE = "";
+for (const p of [
+  process.env.REFERENCE_FILE,
+  "/etc/secrets/ford_reference.md",
+  path.join(__dirname, "ford_reference.md"),
+].filter(Boolean)) {
+  try {
+    if (fs.existsSync(p)) {
+      FORD_REFERENCE = fs.readFileSync(p, "utf8");
+      console.log("Loaded Ford W&P reference from " + p + " (" + FORD_REFERENCE.length + " chars)");
+      break;
+    }
+  } catch {}
+}
+if (!FORD_REFERENCE) console.log("No Ford W&P reference file found - reviewing with general knowledge only.");
+
+// ---------------------------------------------------------------------------
 // The review prompt
 // ---------------------------------------------------------------------------
 const SYSTEM_PROMPT = `You are an experienced Ford dealership warranty administrator reviewing warranty repair-order documentation BEFORE the claim is submitted. You know Ford's warranty documentation expectations cold: the 3 Cs (Concern/Complaint, Cause, Correction), causal part identification, labor operations, actual/punch time, diagnostic path with test results (including OASIS/PTS checks and pinpoint tests where relevant), mileage and dates, VIN, prior-approval thresholds, and the classic audit red flags.
@@ -67,22 +88,22 @@ const SYSTEM_PROMPT = `You are an experienced Ford dealership warranty administr
 Review the ticket text the user provides and respond with ONLY a JSON object (no markdown fences, no commentary) in exactly this shape:
 
 {
-"summary": "2-4 sentence plain-English recap of what this ticket says happened",
-"score": <0-100 integer, overall claim-readiness>,
-"verdict": "ready" | "needs_work" | "high_risk",
-"completeness": [
-{"item": "Complaint (customer concern)", "status": "ok" | "missing" | "unclear", "note": "one short sentence"},
-... one entry per documentation element: Complaint, Cause, Correction, Causal part, Labor op / time, Diagnostic steps & test results, VIN / vehicle info, Mileage & dates, and anything else relevant to THIS ticket
-],
-"risks": [
-{"severity": "critical" | "serious" | "warning", "flag": "short title", "detail": "why this could get the claim rejected or flagged in an audit, and what to do about it"}
-],
-"rewrite": {
-"complaint": "claim-ready Complaint line based only on facts present in the ticket",
-"cause": "claim-ready Cause statement",
-"correction": "claim-ready Correction statement"
-},
-"questions": ["anything the tech/advisor should answer or add before submitting, as short direct questions"]
+  "summary": "2-4 sentence plain-English recap of what this ticket says happened",
+  "score": <0-100 integer, overall claim-readiness>,
+  "verdict": "ready" | "needs_work" | "high_risk",
+  "completeness": [
+    {"item": "Complaint (customer concern)", "status": "ok" | "missing" | "unclear", "note": "one short sentence"},
+    ... one entry per documentation element: Complaint, Cause, Correction, Causal part, Labor op / time, Diagnostic steps & test results, VIN / vehicle info, Mileage & dates, and anything else relevant to THIS ticket
+  ],
+  "risks": [
+    {"severity": "critical" | "serious" | "warning", "flag": "short title", "detail": "why this could get the claim rejected or flagged in an audit, and what to do about it"}
+  ],
+  "rewrite": {
+    "complaint": "claim-ready Complaint line based only on facts present in the ticket",
+    "cause": "claim-ready Cause statement",
+    "correction": "claim-ready Correction statement"
+  },
+  "questions": ["anything the tech/advisor should answer or add before submitting, as short direct questions"]
 }
 
 Rules:
@@ -90,7 +111,10 @@ Rules:
 - "Found bad, replaced"-style causes, missing diagnosis, wear/maintenance items claimed as warranty, aftermarket-part involvement, time far over the labor op, and story inconsistencies are the classic rejection triggers - call them out.
 - Be direct and practical, like a warranty admin who wants the claim to get PAID, not a lecture.
 - Never question or flag the calendar dates on the ticket as implausible or "in the future" - assume the ticket's dates are current. Only flag dates for internal inconsistency (e.g. date out before date in, disclosure before repair).
-- If the pasted text is not a warranty ticket at all, say so in "summary", set score to 0 and verdict to "high_risk", and leave the arrays sensible but short.`;
+- If the pasted text is not a warranty ticket at all, say so in "summary", set score to 0 and verdict to "high_risk", and leave the arrays sensible but short.` +
+  (FORD_REFERENCE
+    ? `\n\nYou also have the dealership's distilled Ford Warranty & Policy Manual reference below. Apply these ACTUAL Ford rules when reviewing: check coverage periods against the vehicle's age/mileage, flag missing prior approvals, missing required test readings, time-limit problems, and exclusions. When a finding is based on a specific rule, cite the manual section number (e.g. "per 1.3.04") in the note or detail so the advisor can look it up.\n\n=== FORD WARRANTY & POLICY REFERENCE ===\n` + FORD_REFERENCE
+    : "");
 
 const MOCK_REVIEW = {
   summary: "Customer brought the vehicle in for a coolant leak. Tech found a cracked degas bottle, replaced it, and pressure-tested the system. Overall the story is believable but the documentation is thin.",
@@ -104,11 +128,11 @@ const MOCK_REVIEW = {
     { item: "Labor op / time", status: "missing", note: "No labor operation or punch time on the ticket." },
     { item: "VIN / vehicle info", status: "ok", note: "VIN present." },
     { item: "Mileage & dates", status: "missing", note: "No mileage recorded." }
-    ],
+  ],
   risks: [
     { severity: "serious", flag: "No punch time", detail: "Claims without actual time are a top audit flag. Add clock-in/out for the repair." },
     { severity: "warning", flag: "Thin diagnosis", detail: "Add the pressure-test result that pointed to the degas bottle." }
-    ],
+  ],
   rewrite: {
     complaint: "Customer states coolant level drops and smells coolant after driving.",
     cause: "Pressure tested cooling system at [ADD PSI/RESULT]; isolated external leak to degas bottle - found crack at seam.",
@@ -137,7 +161,7 @@ async function reviewTicket(ticket) {
   if (!r.ok) throw new Error(data?.error?.message || "Anthropic API error " + r.status);
   let text = (data.content || []).map((c) => c.text || "").join("").trim();
   // Strip accidental code fences and grab the JSON object
-text = text.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+  text = text.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1) throw new Error("The AI returned an unexpected format. Try again.");
@@ -170,7 +194,7 @@ app.post("/login", (req, res) => {
   res.setHeader(
     "Set-Cookie",
     `wtr_auth=${AUTH_TOKEN}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${180 * 24 * 3600}${process.env.RENDER ? "; Secure" : ""}`
-    );
+  );
   res.redirect("/");
 });
 
