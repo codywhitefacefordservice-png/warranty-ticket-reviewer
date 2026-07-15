@@ -141,7 +141,72 @@ const MOCK_REVIEW = {
   questions: ["What was the pressure-test spec and result?", "What is the causal part number?", "What was the actual punch time?"]
 };
 
-async function reviewTicket(ticket) {
+// ---------------------------------------------------------------------------
+// VIN extraction + NHTSA recall lookup (only runs when a VIN is in the ticket)
+// ---------------------------------------------------------------------------
+function extractVin(text) {
+  const matches = String(text).toUpperCase().match(/\b[A-HJ-NPR-Z0-9]{17}\b/g) || [];
+  for (const m of matches) {
+    if (/[A-HJ-NPR-Z]/.test(m) && /[0-9]/.test(m)) return m; // must mix letters+digits
+  }
+  return null;
+}
+
+async function fetchJson(url, ms) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms || 8000);
+  try {
+    const r = await fetch(url, { signal: ctl.signal, headers: { accept: "application/json" } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function lookupRecalls(vin) {
+  try {
+    const dec = await fetchJson(
+      "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/" + encodeURIComponent(vin) + "?format=json"
+    );
+    const v = dec?.Results?.[0] || {};
+    const year = v.ModelYear, make = v.Make, model = v.Model;
+    if (!year || !make || !model) return { vin, error: "Could not decode this VIN." };
+    let list = [];
+    try {
+      const rec = await fetchJson(
+        "https://api.nhtsa.gov/recalls/recallsByVehicle?make=" + encodeURIComponent(make) +
+        "&model=" + encodeURIComponent(model) + "&modelYear=" + encodeURIComponent(year)
+      );
+      list = (rec?.results || []).map((x) => ({
+        campaign: x.NHTSACampaignNumber || "",
+        date: x.ReportReceivedDate || "",
+        component: x.Component || "",
+        summary: String(x.Summary || "").slice(0, 400),
+        remedy: String(x.Remedy || "").slice(0, 300),
+      }));
+    } catch (e) {
+      return { vin, year, make, model, error: "VIN decoded but recall lookup failed: " + e.message };
+    }
+    return { vin, year, make, model, recalls: list };
+  } catch (e) {
+    return { vin, error: "NHTSA lookup failed: " + e.message };
+  }
+}
+
+function recallContext(info) {
+  if (!info || info.error || !info.recalls) return "";
+  let s = "\n\n=== NHTSA RECALL LOOKUP (automatic) ===\nVIN " + info.vin + " decoded as " +
+    info.year + " " + info.make + " " + info.model + ". NHTSA lists " + info.recalls.length +
+    " recall campaign(s) for this year/make/model:\n";
+  for (const r of info.recalls.slice(0, 25)) {
+    s += "- " + r.campaign + " (" + r.date + ") " + r.component + ": " + r.summary + "\n";
+  }
+  s += "\nIMPORTANT: These are model-level campaigns from NHTSA. Whether each recall is OPEN or already COMPLETED on this specific VIN must be verified on OASIS. When reviewing: (1) if the repair in this ticket matches a recall component/condition, flag it CRITICAL - it likely must be claimed as a RECALL (FSA), never coded as warranty (per 6.2.01); (2) remind the advisor to check OASIS for open recalls to complete during this visit. Mention the specific campaign numbers.";
+  return s;
+}
+
+async function reviewTicket(ticket, recallInfo) {
   if (MOCK) return MOCK_REVIEW;
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -154,7 +219,7 @@ async function reviewTicket(ticket) {
       model: "claude-sonnet-4-5",
       max_tokens: 2500,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: "Review this warranty ticket:\n\n" + ticket }],
+      messages: [{ role: "user", content: "Review this warranty ticket:\n\n" + ticket + recallContext(recallInfo) }],
     }),
   });
   const data = await r.json();
@@ -220,8 +285,10 @@ app.post("/api/review", async (req, res) => {
   if (!ticket) return res.status(400).json({ error: "Paste a ticket first." });
   if (ticket.length > 60000) return res.status(400).json({ error: "That ticket is too long — trim it down." });
   try {
-    const review = await reviewTicket(ticket);
-    res.json({ review });
+    const vin = extractVin(ticket);
+    const recallInfo = vin ? await lookupRecalls(vin) : null;
+    const review = await reviewTicket(ticket, recallInfo);
+    res.json({ review, recallInfo });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
