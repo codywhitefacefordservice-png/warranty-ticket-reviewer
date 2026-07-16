@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>History — Warranty Ticket Reviewer</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --border:rgba(11,11,11,.10); --accent:#2a78d6;
+    --good:#0ca30c; --good-ink:#006300; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+           --grid:#2c2c2a; --border:rgba(255,255,255,.10); --accent:#3987e5;
+           --good:#0ca30c; --good-ink:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+       font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:24px 16px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  h1{font-size:22px;margin:0}
+  .sub{color:var(--ink-2);font-size:13px}
+  a{color:var(--accent)}
+  input[type=search]{flex:1;min-width:220px;padding:10px 14px;font-size:15px;border:1px solid var(--border);
+        border-radius:8px;background:var(--surface);color:var(--ink)}
+  input[type=search]:focus{outline:2px solid var(--accent);outline-offset:1px}
+  select{padding:9px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
+  .bar{display:flex;gap:10px;align-items:center;margin:12px 0 8px;flex-wrap:wrap}
+  button{padding:10px 18px;font-size:15px;font-weight:600;border:1px solid var(--border);
+         border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
+  button.primary{background:var(--accent);border-color:transparent;color:#fff}
+  button:hover{filter:brightness(1.05)}
+  .hint{color:var(--muted);font-size:13px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;cursor:pointer}
+  .card:hover{border-color:var(--accent)}
+  .row{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .ro{font-weight:700}
+  .badge{display:inline-flex;padding:2px 10px;border-radius:999px;font-weight:700;font-size:12px}
+  .b-ready{color:var(--good-ink);background:rgba(12,163,12,.12)}
+  .b-needs_work,.b-moderate{color:#8a5a00;background:rgba(250,178,25,.18)}
+  .b-high_risk,.b-weak{color:var(--critical);background:rgba(208,59,59,.12)}
+  .b-strong{color:var(--good-ink);background:rgba(12,163,12,.12)}
+  .b-appeal{color:var(--accent);background:rgba(42,120,214,.12)}
+  @media (prefers-color-scheme: dark){ .b-needs_work,.b-moderate{color:var(--warning)} .b-high_risk,.b-weak{color:#e66767} }
+  .when{color:var(--muted);font-size:12.5px;margin-left:auto}
+  .snip{color:var(--ink-2);font-size:13.5px;margin-top:4px}
+  mark{background:rgba(250,178,25,.45);color:inherit;border-radius:3px;padding:0 1px}
+  .detail{display:none;margin-top:12px;border-top:1px solid var(--grid);padding-top:12px}
+  .detail pre{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Consolas,monospace;background:var(--page);
+              border:1px solid var(--grid);border-radius:8px;padding:10px 12px;max-height:320px;overflow:auto}
+  .kv{margin:6px 0;color:var(--ink-2)} .kv b{color:var(--ink)}
+  .del{font-size:12px;padding:2px 10px;color:var(--critical)}
+  .empty{color:var(--muted);padding:30px 0;text-align:center}
+  .notice{color:#8a5a00;background:rgba(250,178,25,.14);border:1px solid rgba(250,178,25,.4);
+          border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13.5px;display:none}
+  @media (prefers-color-scheme: dark){ .notice{color:var(--warning)} }
+  details.help{margin:4px 0 16px;font-size:13px;color:var(--ink-2)}
+  details.help summary{cursor:pointer;color:var(--accent);font-weight:600}
+  details.help code{background:var(--surface);border:1px solid var(--grid);border-radius:5px;padding:1px 6px;
+                    font:12px ui-monospace,Consolas,monospace;white-space:nowrap}
+  details.help .ex{margin:6px 0}
+  #more{display:none;margin:10px auto;display:block}
+  footer{margin-top:22px;color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>📜 History</h1>
+      <div class="sub">Smart search across every saved review and appeal — RO, VIN, keywords, filters, dates.</div>
+    </div>
+    <div class="sub"><a href="/">Ticket reviewer</a> · <a href="/appeal">Appeal drafter</a> · <a href="/logout">Sign out</a></div>
+  </header>
+
+  <div class="bar">
+    <input type="search" id="q" placeholder='Search anything — RO, VIN, part number, keywords, "exact phrase", score<50, from:7/1…'>
+    <button id="go" class="primary">Search</button>
+  </div>
+  <div class="bar" style="margin-top:0">
+    <select id="ftype">
+      <option value="">All types</option>
+      <option value="review">🔧 Reviews</option>
+      <option value="appeal">⚖️ Appeals</option>
+    </select>
+    <select id="fverdict">
+      <option value="">Any verdict</option>
+      <option value="ready">✔ Ready</option>
+      <option value="needs_work">⚠ Needs work</option>
+      <option value="high_risk">✖ High risk</option>
+      <option value="strong">💪 Strong appeal</option>
+      <option value="moderate">🤔 Moderate appeal</option>
+      <option value="weak">⚠ Weak appeal</option>
+    </select>
+    <select id="fdays">
+      <option value="">Any time</option>
+      <option value="1">Last 24 hours</option>
+      <option value="7">Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last year</option>
+    </select>
+    <span class="hint" id="count"></span>
+  </div>
+
+  <details class="help">
+    <summary>Search tricks</summary>
+    <div class="ex">Type anything — it digs through the whole record: ticket text, checklist, risk flags, write-ups, appeal letters, and recall campaigns.</div>
+    <div class="ex"><b>By number:</b> just type it — <code>348211</code> finds that RO, a 17-character VIN finds that truck. Or be explicit: <code>ro:348211</code> <code>vin:1FTEW1EP5KFA22871</code></div>
+    <div class="ex"><b>Exact phrase:</b> <code>"degas bottle"</code> — words must appear together.</div>
+    <div class="ex"><b>Scores:</b> <code>score&lt;50</code> <code>score&gt;=80</code> — find your rough tickets or your clean ones.</div>
+    <div class="ex"><b>Dates:</b> <code>from:7/1</code> <code>to:7/15</code> <code>on:yesterday</code> <code>from:july</code> — or use the dropdown.</div>
+    <div class="ex"><b>Combine everything:</b> <code>f-150 coolant score&lt;70 from:june type:review</code></div>
+    <div class="ex">Multiple words must ALL match. If nothing matches all of them, it automatically shows records matching ANY of them, ranked by relevance.</div>
+  </details>
+
+  <div class="notice" id="fallback">No records matched every word — showing the closest matches (any word), best first.</div>
+  <div id="list"></div>
+  <button id="more">Load more results</button>
+
+  <footer>Stored on the tool's private disk, behind the access code. Results ranked by relevance, then newest first.</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s){ return String(s ?? "").replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"}[c])); }
+function when(ts){ const d = new Date(ts); return d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}); }
+let offset = 0, needles = [];
+
+function hilite(s){
+  let out = esc(s);
+  for (const n of needles){
+    if (!n || n.length < 2) continue;
+    try { out = out.replace(new RegExp("(" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi"), "<mark>$1</mark>"); } catch {}
+  }
+  return out;
+}
+
+function params(){
+  const p = new URLSearchParams();
+  const q = $("q").value.trim();
+  if (q) p.set("q", q);
+  if ($("ftype").value) p.set("type", $("ftype").value);
+  if ($("fverdict").value) p.set("verdict", $("fverdict").value);
+  if ($("fdays").value) p.set("days", $("fdays").value);
+  return p;
+}
+
+async function load(append){
+  if (!append) offset = 0;
+  const p = params();
+  p.set("offset", offset);
+  const r = await fetch("/api/history?" + p.toString());
+  if (r.status === 401){ location.href = "/"; return; }
+  const data = await r.json();
+  needles = (data.needles || []).filter(n => !n.includes(":") && !n.includes("<") && !n.includes(">"));
+  $("count").textContent = Math.min(offset + data.results.length, data.matched) + " of " + data.matched + " matches · " + data.total + " saved";
+  $("fallback").style.display = data.fallback ? "block" : "none";
+  const html = data.results.map(r => {
+    const badge = r.type === "appeal"
+      ? '<span class="badge b-appeal">⚖️ APPEAL</span> <span class="badge b-' + esc(r.verdict) + '">' + esc(r.verdict || "") + "</span>"
+      : '<span class="badge b-' + esc(r.verdict) + '">' + (r.score != null ? r.score + "/100" : "") + " " + esc(String(r.verdict || "").replace("_", " ")) + "</span>";
+    return `<div class="card" data-id="${r.id}">
+      <div class="row">
+        <span class="ro">${r.ro ? "RO# " + hilite(r.ro) : "(no RO#)"}</span>
+        ${r.vehicle ? '<span class="sub">' + hilite(r.vehicle) + "</span>" : ""}
+        ${r.vin ? '<span class="sub">' + hilite(r.vin) + "</span>" : ""}
+        ${badge}
+        <span class="when">${when(r.ts)}</span>
+      </div>
+      <div class="snip">${hilite(r.summary)}</div>
+      <div class="detail" id="d-${r.id}"></div>
+    </div>`;
+  }).join("");
+  if (append) $("list").insertAdjacentHTML("beforeend", html);
+  else $("list").innerHTML = html || '<div class="empty">' + ($("q").value.trim() ? "No matches — try fewer words, or check the search tricks above." : "Nothing saved yet — run a review and it will appear here.") + "</div>";
+  offset += data.results.length;
+  $("more").style.display = offset < data.matched ? "block" : "none";
+  [...document.querySelectorAll(".card")].forEach(c => {
+    if (!c.dataset.wired){ c.dataset.wired = "1"; c.addEventListener("click", () => open(c.dataset.id)); }
+  });
+}
+
+async function open(id){
+  const d = $("d-" + id);
+  if (d.style.display === "block"){ d.style.display = "none"; return; }
+  if (!d.innerHTML){
+    const r = await fetch("/api/history/" + id);
+    const { record } = await r.json();
+    let html = "";
+    if (record.type === "review"){
+      const rv = record.result || {};
+      html += '<div class="kv"><b>Checklist:</b> ' + (rv.completeness || []).map(c => esc(c.status.toUpperCase() + " " + c.item)).join(" · ") + "</div>";
+      html += '<div class="kv"><b>Risks:</b> ' + ((rv.risks || []).map(x => esc(x.severity.toUpperCase() + ": " + x.flag)).join(" · ") || "none") + "</div>";
+      if (rv.rewrite) html += '<div class="kv"><b>Write-up:</b></div><pre>' + esc("COMPLAINT: " + rv.rewrite.complaint + "\n\nCAUSE: " + rv.rewrite.cause + "\n\nCORRECTION: " + rv.rewrite.correction) + "</pre>";
+      html += '<div class="kv"><b>Original ticket:</b></div><pre>' + esc(record.ticket) + "</pre>";
+    } else {
+      const a = record.result || {};
+      html += '<div class="kv"><b>Assessment:</b> ' + esc((a.analysis?.code || "") + " — " + (a.analysis?.recommendation || "")) + "</div>";
+      if (a.letter) html += '<div class="kv"><b>Appeal letter:</b></div><pre>' + esc(a.letter) + "</pre>";
+      html += '<div class="kv"><b>Rejection notice:</b></div><pre>' + esc(record.rejection) + "</pre>";
+      if (record.ticket) html += '<div class="kv"><b>Original claim:</b></div><pre>' + esc(record.ticket) + "</pre>";
+    }
+    html += '<button class="del" data-id="' + id + '">Delete this record</button>';
+    d.innerHTML = html;
+    d.querySelector(".del").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm("Delete this saved record? This can't be undone.")) return;
+      await fetch("/api/history/" + id, { method: "DELETE" });
+      load(false);
+    });
+    [...d.querySelectorAll("pre, .kv")].forEach(el => el.addEventListener("click", e => e.stopPropagation()));
+  }
+  d.style.display = "block";
+}
+
+$("go").addEventListener("click", () => load(false));
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") load(false); });
+$("more").addEventListener("click", () => load(true));
+["ftype","fverdict","fdays"].forEach(id => $(id).addEventListener("change", () => load(false)));
+load(false);
+</script>
+</body>
+</html>
