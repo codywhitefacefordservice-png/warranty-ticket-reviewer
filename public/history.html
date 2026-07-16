@@ -56,6 +56,7 @@
   .b-high_risk,.b-weak{color:var(--critical);background:rgba(200,16,46,.12)}
   .b-strong{color:var(--good-ink);background:rgba(10,138,58,.12)}
   .b-appeal{color:var(--brand-2);background:rgba(10,75,179,.12)}
+  .b-cat{color:var(--ink-2);background:var(--grid);text-transform:none;letter-spacing:0}
   @media (prefers-color-scheme: dark){ .b-needs_work,.b-moderate{color:var(--warning)} .b-high_risk,.b-weak{color:#ef5a6f} }
   .when{color:var(--muted);font-size:12.5px;margin-left:auto} .sub2{color:var(--ink-2);font-size:13px}
   .snip{color:var(--ink-2);font-size:13.5px;margin-top:4px}
@@ -92,13 +93,15 @@
 
 <div class="wrap">
   <div class="page-title">History</div>
-  <div class="page-sub">Smart search across every saved review and appeal — RO, VIN, keywords, filters, dates.</div>
+  <div class="page-sub">Smart search across every saved review and appeal — filter by repair category and score, or search RO, VIN, keywords, dates.</div>
 
   <div class="bar">
     <input type="search" id="q" placeholder='Search anything — RO, VIN, part number, keywords, "exact phrase", score<50, from:7/1…'>
     <button id="go" class="primary">Search</button>
   </div>
   <div class="bar" style="margin-top:0">
+    <select id="fcat"><option value="">All repair categories</option></select>
+    <select id="fband"><option value="">All scores</option></select>
     <select id="ftype"><option value="">All types</option><option value="review">Reviews</option><option value="appeal">Appeals</option></select>
     <select id="fverdict"><option value="">Any verdict</option><option value="ready">Ready</option><option value="needs_work">Needs work</option><option value="high_risk">High risk</option><option value="strong">Strong appeal</option><option value="moderate">Moderate appeal</option><option value="weak">Weak appeal</option></select>
     <select id="fdays"><option value="">Any time</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option></select>
@@ -138,10 +141,23 @@ function hilite(s){
 function params(){
   const p = new URLSearchParams();
   const q = $("q").value.trim(); if (q) p.set("q", q);
+  if ($("fcat").value) p.set("cat", $("fcat").value);
+  if ($("fband").value) p.set("band", $("fband").value);
   if ($("ftype").value) p.set("type", $("ftype").value);
   if ($("fverdict").value) p.set("verdict", $("fverdict").value);
   if ($("fdays").value) p.set("days", $("fdays").value);
   return p;
+}
+function opt(v, label){ const o = document.createElement("option"); o.value = v; o.textContent = label; return o; }
+function populateFacets(data){
+  const catSel = $("fcat"), bandSel = $("fband");
+  const catVal = catSel.value, bandVal = bandSel.value;
+  catSel.innerHTML = ""; catSel.appendChild(opt("", "All repair categories"));
+  (data.categories || []).forEach(c => catSel.appendChild(opt(c.id, c.label + " (" + ((data.categoryCounts || {})[c.id] || 0) + ")")));
+  catSel.value = catVal;
+  bandSel.innerHTML = ""; bandSel.appendChild(opt("", "All scores"));
+  (data.bands || []).forEach(b => bandSel.appendChild(opt(b.id, b.label + " (" + ((data.bandCounts || {})[b.id] || 0) + ")")));
+  bandSel.value = bandVal;
 }
 async function load(append){
   if (!append) offset = 0;
@@ -149,6 +165,7 @@ async function load(append){
   const r = await fetch("/api/history?" + p.toString());
   if (r.status === 401){ location.href = "/"; return; }
   const data = await r.json();
+  if (!append) populateFacets(data);
   needles = (data.needles || []).filter(n => !n.includes(":") && !n.includes("<") && !n.includes(">"));
   $("count").textContent = Math.min(offset + data.results.length, data.matched) + " of " + data.matched + " matches · " + data.total + " saved";
   $("fallback").style.display = data.fallback ? "block" : "none";
@@ -156,11 +173,12 @@ async function load(append){
     const badge = r.type === "appeal"
       ? '<span class="badge b-appeal">APPEAL</span> <span class="badge b-' + esc(r.verdict) + '">' + esc(r.verdict || "") + "</span>"
       : '<span class="badge b-' + esc(r.verdict) + '">' + (r.score != null ? r.score + "/100" : "") + " " + esc(String(r.verdict || "").replace("_", " ")) + "</span>";
+    const catBadge = r.categoryLabel ? '<span class="badge b-cat">' + esc(r.categoryLabel) + "</span> " : "";
     return `<div class="card" data-id="${r.id}"><div class="row">
         <span class="ro">${r.ro ? "RO# " + hilite(r.ro) : "(no RO#)"}</span>
         ${r.vehicle ? '<span class="sub2">' + hilite(r.vehicle) + "</span>" : ""}
         ${r.vin ? '<span class="sub2">' + hilite(r.vin) + "</span>" : ""}
-        ${badge}<span class="when">${when(r.ts)}</span></div>
+        ${catBadge}${badge}<span class="when">${when(r.ts)}</span></div>
       <div class="snip">${hilite(r.summary)}</div><div class="detail" id="d-${r.id}"></div></div>`;
   }).join("");
   if (append) $("list").insertAdjacentHTML("beforeend", html);
@@ -202,7 +220,7 @@ async function open(id){
 $("go").addEventListener("click", () => load(false));
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") load(false); });
 $("more").addEventListener("click", () => load(true));
-["ftype","fverdict","fdays"].forEach(id => $(id).addEventListener("change", () => load(false)));
+["fcat","fband","ftype","fverdict","fdays"].forEach(id => $(id).addEventListener("change", () => load(false)));
 load(false);
 </script>
 </body>
