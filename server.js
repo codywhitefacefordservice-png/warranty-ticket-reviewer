@@ -440,6 +440,7 @@ async function draftAppeal(rejection, ticket, files) {
     body: JSON.stringify({
       model: "claude-sonnet-4-5",
       max_tokens: 4000,
+      temperature: 0,
       system: APPEAL_PROMPT,
       messages: [{ role: "user", content }],
     }),
@@ -464,8 +465,83 @@ function upcaseRewrite(out) {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Deterministic scoring. The AI returns findings (completeness + risks); the
+// SCORE is computed here by a fixed rulebook so the same findings always
+// produce the same number, and we can explain every point.
+// ---------------------------------------------------------------------------
+function itemWeight(name) {
+  const n = String(name || "").toLowerCase();
+  if (/causal|cause/.test(n)) return { missing: 12, unclear: 6 };
+  if (/correction/.test(n)) return { missing: 10, unclear: 5 };
+  if (/complaint|concern/.test(n)) return { missing: 8, unclear: 4 };
+  if (/labor|punch|\btime\b/.test(n)) return { missing: 8, unclear: 4 };
+  if (/diagnos|test/.test(n)) return { missing: 8, unclear: 4 };
+  if (/hard card|signature|authoriz|consistency/.test(n)) return { missing: 8, unclear: 4 };
+  if (/vin|vehicle/.test(n)) return { missing: 5, unclear: 2 };
+  if (/mileage|date/.test(n)) return { missing: 5, unclear: 2 };
+  return { missing: 6, unclear: 3 };
+}
+const RISK_WEIGHT = { critical: 15, serious: 8, warning: 3 };
+
+function computeScore(review) {
+  const items = Array.isArray(review.completeness) ? review.completeness : [];
+  const risks = Array.isArray(review.risks) ? review.risks : [];
+  const breakdown = [];
+  let deductions = 0;
+
+  for (const it of items) {
+    const st = String(it.status || "").toLowerCase();
+    if (st === "missing" || st === "unclear") {
+      const w = itemWeight(it.item)[st];
+      if (w) {
+        deductions += w;
+        breakdown.push({
+          points: -w,
+          severity: st === "missing" ? "missing" : "unclear",
+          label: (st === "missing" ? "Missing: " : "Unclear: ") + it.item,
+          fix: it.note || "Document this clearly on the repair order.",
+        });
+      }
+    }
+  }
+  for (const rk of risks) {
+    const sev = String(rk.severity || "warning").toLowerCase();
+    const w = RISK_WEIGHT[sev] != null ? RISK_WEIGHT[sev] : 3;
+    deductions += w;
+    breakdown.push({
+      points: -w,
+      severity: sev,
+      label: sev.toUpperCase() + " risk: " + (rk.flag || ""),
+      fix: rk.detail || "",
+    });
+  }
+
+  const score = Math.max(0, Math.min(100, 100 - deductions));
+  const hasCritical = risks.some((r) => String(r.severity).toLowerCase() === "critical");
+  const hasSerious = risks.some((r) => String(r.severity).toLowerCase() === "serious");
+  let verdict;
+  if (hasCritical) verdict = "high_risk";
+  else if (score >= 80 && !hasSerious) verdict = "ready";
+  else if (score >= 55) verdict = "needs_work";
+  else verdict = "high_risk";
+
+  breakdown.sort((a, b) => a.points - b.points); // biggest deductions first
+  return { score, verdict, breakdown };
+}
+
+// Finalize an AI review: uppercase the write-up AND compute the deterministic score.
+function finalizeReview(out) {
+  upcaseRewrite(out);
+  const s = computeScore(out);
+  out.score = s.score;
+  out.verdict = s.verdict;
+  out.scoreBreakdown = s.breakdown;
+  return out;
+}
+
 async function reviewTicket(ticket, recallInfo, files) {
-  if (MOCK) return upcaseRewrite(MOCK_REVIEW);
+  if (MOCK) return finalizeReview(JSON.parse(JSON.stringify(MOCK_REVIEW)));
   const blocks = fileBlocks(files);
   const intro = blocks.length
     ? "Attached above: " + blocks.length + " file(s) showing the physical repair-order hard card (time punches, initials, signatures). Cross-check them against the typed ticket below.\n\n"
@@ -484,6 +560,7 @@ async function reviewTicket(ticket, recallInfo, files) {
     body: JSON.stringify({
       model: "claude-sonnet-4-5",
       max_tokens: 4000,
+      temperature: 0,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],
     }),
@@ -496,7 +573,7 @@ async function reviewTicket(ticket, recallInfo, files) {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1) throw new Error("The AI returned an unexpected format. Try again.");
-  return upcaseRewrite(JSON.parse(text.slice(start, end + 1)));
+  return finalizeReview(JSON.parse(text.slice(start, end + 1)));
 }
 
 // ---------------------------------------------------------------------------
@@ -507,6 +584,16 @@ app.use(express.json({ limit: "45mb" }));
 app.use(express.urlencoded({ extended: false }));
 
 const LOGIN_PAGE = fs.readFileSync(path.join(__dirname, "public", "login.html"), "utf8");
+
+// Dealership logo, embedded so every page (incl. login) can show it without an extra file.
+let LOGO_B64 = "";
+try { LOGO_B64 = require("./logo.js"); } catch (e) { console.log("logo.js not found - logo disabled"); }
+app.get("/logo.png", (_req, res) => {
+  if (!LOGO_B64) return res.status(404).end();
+  res.setHeader("Content-Type", "image/png");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.end(Buffer.from(LOGO_B64, "base64"));
+});
 
 app.get("/healthz", (_req, res) => res.send("ok"));
 
