@@ -224,6 +224,70 @@ function fileBlocks(files) {
   return blocks;
 }
 
+// ---------------------------------------------------------------------------
+// Appeal drafter prompt
+// ---------------------------------------------------------------------------
+const APPEAL_PROMPT = `You are a veteran Ford dealership warranty administrator who writes claim appeals that get PAID. The user gives you (1) the rejection, denial, or chargeback notice from Ford and (2) the original repair order / claim, plus optional images or PDFs of the paperwork.
+
+Respond with ONLY a JSON object (no markdown fences) in exactly this shape:
+
+{
+  "analysis": {
+    "code": "the rejection/return message or chargeback code you identified (e.g. P62, or the OWS return reason), or 'unclear'",
+    "reason": "1-2 sentences: why Ford rejected or charged back this claim, in plain English",
+    "strength": "strong" | "moderate" | "weak",
+    "recommendation": "one honest sentence: file the appeal now / gather the listed evidence first / this appeal is unlikely to win and why",
+    "deadline": "the applicable appeal deadline and channel per the W&P manual (appeals within 45 days; two OWS appeals then one web appeal; WPAC parts chargebacks appeal via the web appeal, NOT in OWS)"
+  },
+  "arguments": [
+    {"point": "a specific argument for why the claim should be paid, grounded ONLY in facts present in the provided documents", "citation": "the W&P manual section that supports it, e.g. 1.3.04, or 'documentation' if it rests on the RO itself"}
+  ],
+  "evidence": ["each document/photo/printout the dealer should attach or have ready, as a short imperative item"],
+  "letter": "the complete appeal text, ready to paste into the OWS appeal comments or web appeal form. Professional, factual, firm, concise (under ~350 words). Structure: what the claim was, why it was returned/charged back, point-by-point rebuttal with W&P citations, what is attached, and the specific request (pay the claim / reverse the chargeback). Use bracketed placeholders like [ATTACH ALIGNMENT PRINTOUT] or [DEALER P&A CODE] for anything not present in the provided documents - NEVER invent facts, dates, readings, or documents."
+}
+
+Rules:
+- Be honest. If the denial is correct per the W&P manual (e.g. a true wear item, real missing punch time, genuine modification), say so in the recommendation, set strength to "weak", and make the letter argue only what is genuinely arguable - or state plainly that the better path is fixing the documentation gap where allowed.
+- Never coach the user to misrepresent anything. Appeals must rest on facts in the documents.
+- Identify the specific chargeback code family when possible: P61 not defective, P62 damaged, P63 wrong part, P64 disassembled/incomplete, P65 over-repair, P66 not received, P67 non-genuine.
+- If the input does not look like a rejection/chargeback plus a claim, say so in analysis.reason and keep the rest minimal.` +
+  (FORD_REFERENCE
+    ? `\n\nApply the dealership's distilled Ford Warranty & Policy Manual reference below and cite section numbers in your arguments.\n\n=== FORD WARRANTY & POLICY REFERENCE ===\n` + FORD_REFERENCE
+    : "");
+
+async function draftAppeal(rejection, ticket, files) {
+  const blocks = fileBlocks(files);
+  const intro = blocks.length
+    ? "Attached above: " + blocks.length + " file(s) of the claim paperwork.\n\n"
+    : "";
+  const content = [
+    ...blocks,
+    { type: "text", text: intro + "=== REJECTION / CHARGEBACK NOTICE ===\n" + rejection + "\n\n=== ORIGINAL REPAIR ORDER / CLAIM ===\n" + (ticket || "(not provided)") },
+  ];
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-5",
+      max_tokens: 4000,
+      system: APPEAL_PROMPT,
+      messages: [{ role: "user", content }],
+    }),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.error?.message || "Anthropic API error " + r.status);
+  let text = (data.content || []).map((c) => c.text || "").join("").trim();
+  text = text.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1) throw new Error("The AI returned an unexpected format. Try again.");
+  return JSON.parse(text.slice(start, end + 1));
+}
+
 // RO style: the claim-ready write-up is always ALL CAPS
 function upcaseRewrite(out) {
   if (out && out.rewrite) {
@@ -306,7 +370,7 @@ app.get("/logout", (_req, res) => {
 
 app.use((req, res, next) => {
   if (isAuthed(req)) return next();
-  if (req.path === "/" && req.method === "GET") {
+  if ((req.path === "/" || req.path === "/appeal") && req.method === "GET") {
     return res.send(LOGIN_PAGE.replace("<!--MSG-->", ""));
   }
   return res.status(401).json({ error: "not logged in" });
@@ -314,6 +378,24 @@ app.use((req, res, next) => {
 
 app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.get("/appeal", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "appeal.html"));
+});
+
+app.post("/api/appeal", async (req, res) => {
+  const rejection = String(req.body.rejection || "").trim();
+  const ticket = String(req.body.ticket || "").trim();
+  if (!rejection) return res.status(400).json({ error: "Paste the rejection or chargeback notice first." });
+  if (rejection.length + ticket.length > 80000) return res.status(400).json({ error: "That's too long — trim it down." });
+  const files = Array.isArray(req.body.files) ? req.body.files : [];
+  try {
+    const appeal = await draftAppeal(rejection, ticket, files);
+    res.json({ appeal });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
 });
 
 app.post("/api/review", async (req, res) => {
