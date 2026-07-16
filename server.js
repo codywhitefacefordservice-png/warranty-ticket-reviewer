@@ -125,17 +125,25 @@ for (const p of [
 if (!ESP_REFERENCE) console.log("No ESP claiming reference file found.");
 
 // Claim-type rulebook: what the reviewer applies on top of the base prompt.
+// Note: ESP is OWS Claim Type 11 with Sub-Code ESP (Type 71 is competitive-make);
+// SPW is its own Type 21. Standard NVLW and ESP share code 11 but different rules,
+// so they carry distinct internal keys ("11" vs "11-ESP").
 const CLAIM_TYPES = {
-  "11": { label: "11 — Standard vehicle warranty (NVLW)" },
-  "21": { label: "21 — ESP / SPW (service contract)" },
-  "31": { label: "31 — FSA / Recall" },
+  "11":     { label: "11 — Standard vehicle warranty (NVLW)" },
+  "11-ESP": { label: "11 — ESP / service contract (Sub-Code ESP)" },
+  "21":     { label: "21 — Service Part Warranty (SPW)" },
+  "31":     { label: "31 — FSA / Recall" },
 };
 function claimTypeAddendum(claimType) {
   const ct = String(claimType || "");
-  if (ct === "21") {
-    return "\n\n=== CLAIM TYPE: 21 — ESP / SERVICE CONTRACT (Ford Protect / Lincoln Protect) ===\n" +
-      "This claim is under a paid Ford Protect / Lincoln Protect service contract (ESP) or Service Part Warranty — NOT the base New Vehicle Limited Warranty. Coverage, the deductible, prior-approval thresholds, the submission window, parts-markup caps, and rental/loaner rules are governed by the CONTRACT and the ESP manual below, applied ON TOP OF the base rules. Actively check: which plan is in force (PremiumCARE / ExtraCARE / BaseCARE / PowertrainCARE / Powertrain Wrap / EV / Maintenance / CPO / Blue Advantage, etc.) and whether the repaired component is actually covered under THAT plan and tier; that the contract is in force by time, miles AND engine hours and is not cancelled; that the correct deductible is applied; that prior approval was obtained where the ESP dollar thresholds require it; and the correct ESP claim type / sub-code. Treat a missing/incorrect deductible, an uncovered component, an out-of-force contract, or a missing ESP prior approval as CRITICAL. Cite ESP manual pages (e.g. \"per ESP 11:24\")." +
+  if (ct === "11-ESP") {
+    return "\n\n=== CLAIM TYPE: 11 (Sub-Code ESP) — ESP / SERVICE CONTRACT (Ford Protect / Lincoln Protect) ===\n" +
+      "This is a Ford Protect / Lincoln Protect service-contract (ESP) claim — OWS Claim Type 11, Sub-Code ESP (competitive-make is Type 71/ESC). It is NOT the base New Vehicle Limited Warranty. Coverage, the deductible, prior-approval thresholds, the submission window, parts-markup caps, and rental/loaner rules are governed by the CONTRACT and the ESP manual below, applied ON TOP OF the base rules. Actively check: which plan is in force (PremiumCARE / ExtraCARE / BaseCARE / PowertrainCARE / Powertrain Wrap / EV / Maintenance / CPO / Blue Advantage, etc.) and whether the repaired component is actually covered under THAT plan and tier; that the contract is in force by time, miles AND engine hours and is not cancelled; that the correct deductible is applied; that prior approval was obtained where the ESP dollar thresholds require it; and the correct sub-code. Treat a missing/incorrect deductible, an uncovered component, an out-of-force contract, or a missing ESP prior approval as CRITICAL. Cite ESP manual pages (e.g. \"per ESP 11:24\")." +
       (ESP_REFERENCE ? "\n\n=== FORD/LINCOLN PROTECT (ESP) CLAIMING REFERENCE ===\n" + ESP_REFERENCE : "");
+  }
+  if (ct === "21") {
+    return "\n\n=== CLAIM TYPE: 21 — SERVICE PART WARRANTY (SPW) ===\n" +
+      "This claim is for a Ford / Motorcraft / Omnicraft service or replacement part the dealership installed — governed by Service Part Warranty, NOT the vehicle NVLW and NOT an ESP contract. Actively check: the part is a Ford-sold service part; SPW coverage is in force (12 months / 12,000 miles from the part's install date for warranty-installed parts; 24 months / unlimited for customer-paid parts); the required Install Date, Elapsed Odometer, and Original Repair Order / Invoice Number are present; the correct sub-code (SPW / SPNV / OTC); that a replacement part assumes only the REMAINING warranty of the part it replaces (it never restarts); and that SPW prior approval was obtained for assemblies whose causal base part starts with 6, 7 or 9 and repair cost exceeds $1,000. Apply the W&P Service Part Warranty rules and the OWS SPW/OTC claiming rules. Treat an out-of-force SPW period, a missing original-RO/invoice reference, or a missing SPW prior approval as CRITICAL.";
   }
   if (ct === "31") {
     return "\n\n=== CLAIM TYPE: 31 — FIELD SERVICE ACTION (RECALL / CSP / FSA) ===\n" +
@@ -328,7 +336,7 @@ function saveHistory() {
 // guaranteed. Bump RUBRIC_VERSION whenever the scoring logic, weights, or
 // system prompt change so previously cached results are invalidated.
 // ---------------------------------------------------------------------------
-const RUBRIC_VERSION = "2026-07-16.4";
+const RUBRIC_VERSION = "2026-07-16.5";
 const REVIEW_CACHE_FILE = path.join(HISTORY_DIR, "review_cache.json");
 const REVIEW_CACHE_CAP = 3000;
 let REVIEW_CACHE = {};
