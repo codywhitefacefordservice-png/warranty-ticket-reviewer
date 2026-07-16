@@ -81,6 +81,28 @@ for (const p of [
 if (!FORD_REFERENCE) console.log("No Ford W&P reference file found - reviewing with general knowledge only.");
 
 // ---------------------------------------------------------------------------
+// Optional distilled Ford OWS Claiming reference (how a claim must be entered /
+// coded / submitted in OWS). Loaded from (in order): OWS_REFERENCE_FILE env var,
+// Render secret file, or a local ows_reference.md. Kept OUT of the public repo —
+// deploy it as a Render Secret File.
+// ---------------------------------------------------------------------------
+let OWS_REFERENCE = "";
+for (const p of [
+  process.env.OWS_REFERENCE_FILE,
+  "/etc/secrets/ows_reference.md",
+  path.join(__dirname, "ows_reference.md"),
+].filter(Boolean)) {
+  try {
+    if (fs.existsSync(p)) {
+      OWS_REFERENCE = fs.readFileSync(p, "utf8");
+      console.log("Loaded OWS claiming reference from " + p + " (" + OWS_REFERENCE.length + " chars)");
+      break;
+    }
+  } catch {}
+}
+if (!OWS_REFERENCE) console.log("No OWS claiming reference file found.");
+
+// ---------------------------------------------------------------------------
 // The review prompt
 // ---------------------------------------------------------------------------
 const SYSTEM_PROMPT = `You are an experienced Ford dealership warranty administrator reviewing warranty repair-order documentation BEFORE the claim is submitted. You know Ford's warranty documentation expectations cold: the 3 Cs (Concern/Complaint, Cause, Correction), causal part identification, labor operations, actual/punch time, diagnostic path with test results (including OASIS/PTS checks and pinpoint tests where relevant), mileage and dates, VIN, prior-approval thresholds, and the classic audit red flags.
@@ -115,6 +137,9 @@ Rules:
 - If images or PDFs of the physical repair-order HARD CARD are attached: the hard copy is the OFFICIAL record of the repair (per 1.2.01). Read them carefully and cross-check against the typed ticket. Verify: time punches present (start AND finish for each actual-time repair, per 1.3.04); add-on repairs initialed by service management on the same line with "ADD" in the labor op column (per 1.2.04); required signatures/authorizations present (customer signature or management authorization for dealer vehicles - rubber stamps not acceptable); handwritten tech comments and test results; and that the hard card matches the typed story (mileage, dates, parts, hours). ALWAYS do the punch math explicitly: sum every ON-to-OFF interval on the card, state the total in the note (e.g. "punches total 1.4 hr"), and compare it to the hours claimed on the ticket - any difference is a discrepancy. Add completeness entries for "Hard card: time punches", "Hard card: signatures/authorizations", and "Hard card vs ticket consistency". Flag ANY discrepancy between hard card and typed claim as serious or critical - hard-card mismatches are classic audit findings. If an attached file is unreadable or isn't a repair order, say so in a completeness note.` +
   (FORD_REFERENCE
     ? `\n\nYou also have the dealership's distilled Ford Warranty & Policy Manual reference below. Apply these ACTUAL Ford rules when reviewing: check coverage periods against the vehicle's age/mileage, flag missing prior approvals, missing required test readings, time-limit problems, and exclusions. When a finding is based on a specific rule, cite the manual section number (e.g. "per 1.3.04") in the note or detail so the advisor can look it up.\n\n=== FORD WARRANTY & POLICY REFERENCE ===\n` + FORD_REFERENCE
+    : "") +
+  (OWS_REFERENCE
+    ? `\n\nYou ALSO have the dealership's distilled Ford OWS (Online Warranty System) Claiming reference below — the rules for how a claim must be coded and submitted in OWS. Use it to check claim-readiness: the causal part and its 2-char condition code, the customer concern code, required comments (3 Cs in the comment fields), standard vs actual time claiming, exception/self-approval codes, required attachments, sublet (OSP/OSL) entry, and the commodity-specific rules (battery tester codes, paint material, tires, etc.). When a finding is based on an OWS rule, cite the OWS section (e.g. "per OWS §4 causal part") so the advisor can look it up. Flag OWS-specific rejection triggers from its "Common Rejection / Return Triggers" list.\n\n=== FORD OWS CLAIMING REFERENCE ===\n` + OWS_REFERENCE
     : "");
 
 const MOCK_REVIEW = {
@@ -260,7 +285,7 @@ function saveHistory() {
 // guaranteed. Bump RUBRIC_VERSION whenever the scoring logic, weights, or
 // system prompt change so previously cached results are invalidated.
 // ---------------------------------------------------------------------------
-const RUBRIC_VERSION = "2026-07-16.2";
+const RUBRIC_VERSION = "2026-07-16.3";
 const REVIEW_CACHE_FILE = path.join(HISTORY_DIR, "review_cache.json");
 const REVIEW_CACHE_CAP = 3000;
 let REVIEW_CACHE = {};
@@ -479,6 +504,9 @@ Rules:
 - If the input does not look like a rejection/chargeback plus a claim, say so in analysis.reason and keep the rest minimal.` +
   (FORD_REFERENCE
     ? `\n\nApply the dealership's distilled Ford Warranty & Policy Manual reference below and cite section numbers in your arguments.\n\n=== FORD WARRANTY & POLICY REFERENCE ===\n` + FORD_REFERENCE
+    : "") +
+  (OWS_REFERENCE
+    ? `\n\nYou also have the dealership's distilled Ford OWS Claiming reference below — cite its rules where the rejection concerns claim coding, causal part / condition code, comments, time claiming, exception codes, or sublet entry.\n\n=== FORD OWS CLAIMING REFERENCE ===\n` + OWS_REFERENCE
     : "");
 
 async function draftAppeal(rejection, ticket, files) {
