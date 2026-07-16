@@ -225,6 +225,58 @@ function fileBlocks(files) {
 }
 
 // ---------------------------------------------------------------------------
+// History: every review/appeal is saved to a JSON file so it can be searched.
+// Uses /data (Render persistent disk) when present, else ./data locally.
+// ---------------------------------------------------------------------------
+const HISTORY_DIR = process.env.HISTORY_DIR || (fs.existsSync("/data") ? "/data" : path.join(__dirname, "data"));
+const HISTORY_FILE = path.join(HISTORY_DIR, "history.json");
+let HISTORY = [];
+try {
+  fs.mkdirSync(HISTORY_DIR, { recursive: true });
+  if (fs.existsSync(HISTORY_FILE)) HISTORY = JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
+  console.log("History: " + HISTORY.length + " record(s) loaded from " + HISTORY_FILE);
+} catch (e) {
+  console.error("History load failed:", e.message);
+}
+
+function saveHistory() {
+  try {
+    if (HISTORY.length > 5000) HISTORY = HISTORY.slice(-5000); // cap
+    const tmp = HISTORY_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(HISTORY));
+    fs.renameSync(tmp, HISTORY_FILE);
+  } catch (e) {
+    console.error("History save failed:", e.message);
+  }
+}
+
+function extractRo(text) {
+  const m = String(text).match(/\bR\.?O\.?\s*[#:\-]?\s*([0-9]{4,10})\b/i);
+  return m ? m[1] : "";
+}
+
+function addHistory(rec) {
+  rec.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  rec.ts = new Date().toISOString();
+  HISTORY.push(rec);
+  saveHistory();
+  return rec.id;
+}
+
+function searchHistory(q) {
+  const terms = String(q || "").toLowerCase().split(/\s+/).filter(Boolean);
+  let list = HISTORY;
+  if (terms.length) {
+    list = HISTORY.filter((r) => {
+      const hay = ((r.ro || "") + " " + (r.vin || "") + " " + (r.vehicle || "") + " " +
+        (r.summary || "") + " " + (r.ticket || "") + " " + (r.rejection || "")).toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    });
+  }
+  return list.slice().reverse().slice(0, 50);
+}
+
+// ---------------------------------------------------------------------------
 // Appeal drafter prompt
 // ---------------------------------------------------------------------------
 const APPEAL_PROMPT = `You are a veteran Ford dealership warranty administrator who writes claim appeals that get PAID. The user gives you (1) the rejection, denial, or chargeback notice from Ford and (2) the original repair order / claim, plus optional images or PDFs of the paperwork.
@@ -370,7 +422,7 @@ app.get("/logout", (_req, res) => {
 
 app.use((req, res, next) => {
   if (isAuthed(req)) return next();
-  if ((req.path === "/" || req.path === "/appeal") && req.method === "GET") {
+  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history") && req.method === "GET") {
     return res.send(LOGIN_PAGE.replace("<!--MSG-->", ""));
   }
   return res.status(401).json({ error: "not logged in" });
@@ -392,6 +444,17 @@ app.post("/api/appeal", async (req, res) => {
   const files = Array.isArray(req.body.files) ? req.body.files : [];
   try {
     const appeal = await draftAppeal(rejection, ticket, files);
+    addHistory({
+      type: "appeal",
+      ro: extractRo(rejection + " " + ticket),
+      vin: extractVin(rejection + " " + ticket) || "",
+      vehicle: "",
+      score: null,
+      verdict: appeal?.analysis?.strength || "",
+      summary: appeal?.analysis?.reason || "",
+      ticket, rejection,
+      result: appeal,
+    });
     res.json({ appeal });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -407,10 +470,49 @@ app.post("/api/review", async (req, res) => {
     const vin = extractVin(ticket);
     const recallInfo = vin ? await lookupRecalls(vin) : null;
     const review = await reviewTicket(ticket, recallInfo, files);
+    addHistory({
+      type: "review",
+      ro: extractRo(ticket),
+      vin: vin || "",
+      vehicle: recallInfo && !recallInfo.error ? (recallInfo.year + " " + recallInfo.make + " " + recallInfo.model) : "",
+      score: review?.score ?? null,
+      verdict: review?.verdict || "",
+      summary: review?.summary || "",
+      ticket, rejection: "",
+      result: review,
+      recallInfo,
+    });
     res.json({ review, recallInfo });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
+});
+
+// History endpoints
+app.get("/history", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "history.html"));
+});
+
+app.get("/api/history", (req, res) => {
+  const list = searchHistory(req.query.q).map((r) => ({
+    id: r.id, ts: r.ts, type: r.type, ro: r.ro, vin: r.vin, vehicle: r.vehicle,
+    score: r.score, verdict: r.verdict, summary: String(r.summary || "").slice(0, 220),
+  }));
+  res.json({ total: HISTORY.length, results: list });
+});
+
+app.get("/api/history/:id", (req, res) => {
+  const rec = HISTORY.find((r) => r.id === req.params.id);
+  if (!rec) return res.status(404).json({ error: "Not found" });
+  res.json({ record: rec });
+});
+
+app.delete("/api/history/:id", (req, res) => {
+  const i = HISTORY.findIndex((r) => r.id === req.params.id);
+  if (i === -1) return res.status(404).json({ error: "Not found" });
+  HISTORY.splice(i, 1);
+  saveHistory();
+  res.json({ ok: true });
 });
 
 app.listen(PORT, () => console.log("Warranty Ticket Reviewer listening on port " + PORT));
