@@ -40,6 +40,21 @@
   textarea{width:100%;min-height:220px;padding:14px;font:13.5px/1.5 ui-monospace,Consolas,monospace;
            border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);resize:vertical}
   textarea:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  /* structured input form */
+  .fgrid{display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:12px;margin-bottom:14px}
+  @media (max-width:640px){ .fgrid{grid-template-columns:1fr 1fr} }
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:11.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+  .req{color:var(--critical)}
+  .opt{color:var(--muted);text-transform:none;letter-spacing:0;font-weight:600}
+  input{width:100%;padding:10px 12px;font:14.5px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
+  input:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  textarea.c3{min-height:64px;font-size:14px}
+  #f-detail{min-height:120px}
+  .field.bad input,.field.bad textarea{border-color:var(--critical);outline-color:var(--critical)}
+  .field.bad label{color:var(--critical)}
   .bar{display:flex;gap:10px;align-items:center;margin:12px 0 24px;flex-wrap:wrap}
   button{padding:11px 20px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(16,23,38,.06);transition:border-color .12s ease,box-shadow .12s ease,transform .05s ease,filter .12s ease}
   button:hover{border-color:var(--brand-2);box-shadow:0 2px 6px rgba(16,23,38,.12)}
@@ -114,9 +129,20 @@
 
 <div class="wrap">
   <div class="page-title">Warranty Ticket Reviewer</div>
-  <div class="page-sub">Paste the repair order for a documentation review, risk check, and claim-ready write-up before submission.</div>
+  <div class="page-sub">Enter the repair-order details for a documentation review, risk check, and claim-ready write-up before submission. Fields marked <span class="req">*</span> are required.</div>
 
-  <textarea id="ticket" placeholder="Paste the whole ticket here — RO text, tech story, punch time, parts, VIN, mileage… the more you paste, the better the review."></textarea>
+  <div class="card" id="inputcard">
+    <div class="fgrid">
+      <div class="field"><label for="f-ro">Repair Order # <span class="req">*</span></label><input id="f-ro" autocomplete="off" placeholder="e.g. 771902"></div>
+      <div class="field"><label for="f-line">Line # <span class="req">*</span></label><input id="f-line" autocomplete="off" placeholder="e.g. A"></div>
+      <div class="field"><label for="f-vin">VIN <span class="req">*</span></label><input id="f-vin" autocomplete="off" maxlength="17" placeholder="17-character VIN" style="text-transform:uppercase"></div>
+      <div class="field"><label for="f-mileage">Mileage <span class="req">*</span></label><input id="f-mileage" autocomplete="off" inputmode="numeric" placeholder="e.g. 41250"></div>
+    </div>
+    <div class="field"><label for="f-complaint">Complaint — customer concern <span class="req">*</span></label><textarea id="f-complaint" class="c3" placeholder="What the customer reported."></textarea></div>
+    <div class="field"><label for="f-cause">Cause <span class="req">*</span></label><textarea id="f-cause" class="c3" placeholder="What was found to be causing it — the causal part / condition."></textarea></div>
+    <div class="field"><label for="f-correction">Correction <span class="req">*</span></label><textarea id="f-correction" class="c3" placeholder="What was done to fix it."></textarea></div>
+    <div class="field"><label for="f-detail">Additional repair-order detail <span class="opt">(optional — improves the review)</span></label><textarea id="f-detail" placeholder="Diagnosis path & test results, labor op & punch time, parts, sublet, hard-card notes… the more detail, the sharper the risk check."></textarea></div>
+  </div>
   <input type="file" id="files" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple style="display:none">
   <div class="bar">
     <button id="go" class="primary">Review ticket</button>
@@ -202,13 +228,35 @@ function renderFiles(){
   [...$("filelist").querySelectorAll("button")].forEach(b => b.addEventListener("click", () => { attached.splice(Number(b.dataset.i), 1); renderFiles(); }));
 }
 
+const FIELD_IDS = ["f-ro","f-line","f-vin","f-mileage","f-complaint","f-cause","f-correction","f-detail"];
+const REQUIRED = [["ro","Repair Order #"],["line","Line #"],["vin","VIN"],["mileage","Mileage"],["complaint","Complaint"],["cause","Cause"],["correction","Correction"]];
+// clear the red "required" mark as soon as the user starts typing
+REQUIRED.forEach(([k]) => { const el = $("f-" + k); el && el.addEventListener("input", () => el.closest(".field").classList.remove("bad")); });
+
 $("go").addEventListener("click", async () => {
-  const ticket = $("ticket").value.trim();
   const err = $("err"); err.style.display = "none";
-  if (!ticket){ err.textContent = "Paste a ticket first."; err.style.display = "block"; return; }
+  document.querySelectorAll(".field.bad").forEach(f => f.classList.remove("bad"));
+  const fields = {
+    ro: $("f-ro").value.trim(),
+    line: $("f-line").value.trim(),
+    vin: $("f-vin").value.trim().toUpperCase(),
+    mileage: $("f-mileage").value.trim(),
+    complaint: $("f-complaint").value.trim(),
+    cause: $("f-cause").value.trim(),
+    correction: $("f-correction").value.trim(),
+    detail: $("f-detail").value.trim(),
+  };
+  const missing = REQUIRED.filter(([k]) => !fields[k]);
+  if (missing.length){
+    missing.forEach(([k]) => { const el = $("f-" + k); if (el) el.closest(".field").classList.add("bad"); });
+    err.textContent = "Please fill in all required fields before reviewing: " + missing.map(([, l]) => l).join(", ") + ".";
+    err.style.display = "block";
+    err.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   const btn = $("go"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Reviewing…';
   try{
-    const r = await fetch("/api/review", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({ ticket, files: attached }) });
+    const r = await fetch("/api/review", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({ ...fields, files: attached }) });
     if (r.status === 401){ location.href = "/"; return; }
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Review failed");
@@ -216,7 +264,11 @@ $("go").addEventListener("click", async () => {
   }catch(e){ err.textContent = "Review failed: " + e.message; err.style.display = "block"; }
   finally{ btn.disabled = false; btn.textContent = "Review ticket"; }
 });
-$("clear").addEventListener("click", () => { $("ticket").value = ""; attached = []; renderFiles(); $("results").style.display = "none"; $("err").style.display = "none"; });
+$("clear").addEventListener("click", () => {
+  FIELD_IDS.forEach(id => { const el = $(id); if (el) el.value = ""; });
+  document.querySelectorAll(".field.bad").forEach(f => f.classList.remove("bad"));
+  attached = []; renderFiles(); $("results").style.display = "none"; $("err").style.display = "none";
+});
 
 function show(rv){
   $("r-score").innerHTML = esc(rv.score) + "<small>/100</small>";
