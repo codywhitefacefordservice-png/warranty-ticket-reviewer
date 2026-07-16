@@ -527,6 +527,83 @@ function searchHistory(qstr, opts) {
 }
 
 // ---------------------------------------------------------------------------
+// Repair-category classification for the History page. Each saved record is
+// binned into one of 15 categories from its own text (complaint/cause/correction,
+// summary, ticket) so history is browsable by system — works for old records too.
+// CAT_DEFS is in PRIORITY order (first keyword hit wins); CATEGORY_META is the
+// display order shown in the dropdown.
+// ---------------------------------------------------------------------------
+const CAT_DEFS = [
+  { id: "paint", kw: ["paint","clearcoat","clear coat","repaint","refinish","blend panel","orange peel","overspray","primer","paint blister","paint bubble","peeling clear","paint chip","paint defect"] },
+  { id: "transmission", kw: ["transmission","transaxle","torque converter","valve body","shift solenoid","shift flare","harsh shift","slipping","clutch","mechatronic"," cvt ","10r80","10r60","6f35","6f50","powershift","gear selector","shudder","limp mode","no reverse","tcm"] },
+  { id: "cooling", kw: ["coolant","radiator","water pump","thermostat","overheat","cooling fan","heater core","degas","antifreeze","engine temp","coolant leak"] },
+  { id: "fuel", kw: ["fuel","injector","fuel pump","fuel tank","fuel rail","fuel line","throttle body","intake manifold","exhaust manifold","manifold","evap","purge valve","canister","hpfp","high pressure pump","fuel filter","fuel sender","fuel level","carburetor","fuel gauge"] },
+  { id: "wheels", kw: ["wheel bearing","hub bearing","wheel hub","brake drum"," drum ","wheel stud","lug nut","lug bolt","wheel seal","hub assembly","hub unit"] },
+  { id: "brakes", kw: ["brake","caliper","rotor","brake pad","brake shoe","master cylinder","brake booster","abs module","abs pump","brake line","parking brake","wheel cylinder","brake fluid","brake hose"] },
+  { id: "rear_axle", kw: ["rear axle","differential","axle shaft","axle seal","pinion","ring gear","carrier bearing"," diff ","limited slip","rear diff","axle bearing"] },
+  { id: "exhaust_rearsusp", kw: ["exhaust","muffler","catalytic","cat converter","tailpipe","resonator"," dpf"," def "," scr ","leaf spring","rear shock","rear strut","rear spring","rear suspension","shackle","rear sway"] },
+  { id: "front_susp", kw: ["steering","tie rod","control arm","ball joint","strut","sway bar","stabilizer","rack and pinion","power steering","alignment","cv axle","cv joint","spindle","idler arm","pitman","front shock","front spring","coil spring","steering column","steering gear","knuckle","shock absorber","suspension","pulls to","wander"] },
+  { id: "engine", kw: ["engine","cylinder","piston","crankshaft","camshaft","timing chain","timing belt","head gasket","oil pump","oil pan","oil leak","valve cover","cam phaser","lifter","rocker","spark plug","ignition coil","engine mount","turbo","supercharger"," vct ","cylinder head","oil consumption","knock","misfire","compression"," pcv ","engine noise"] },
+  { id: "accessories", kw: ["accessory","radio","sync ","apim","navigation","infotainment","backup camera","rear camera","sunroof","moonroof","running board","trailer","hitch","bedliner","spray-in","remote start","seat heater","heated seat","floor liner","tonneau","step bar"] },
+  { id: "body", kw: ["body","door","hood","fender","bumper","quarter panel","weatherstrip","window regulator","glass","windshield","mirror","latch","hinge","molding","trim panel","water leak","wind noise","rattle","door handle","tailgate","liftgate","sun visor","fit and finish","misaligned"] },
+  { id: "electrical", kw: ["electrical","battery","alternator","starter","wiring","harness"," fuse","relay","module","pcm","ecm","bcm"," gem ","sensor","connector","ground ","short circuit","open circuit","headlight","taillight","bulb"," lamp","lock actuator","window motor","wiper motor","blower motor","tpms","no crank","dead battery","parasitic draw","warning light"] },
+  { id: "maintenance", kw: ["oil change","tire rotation","scheduled maintenance","scheduled service","multi-point","multipoint","cabin filter","air filter","fluid flush","brake flush","wiper blade","the works","maintenance"] },
+];
+const CATEGORY_META = [
+  { id: "wheels", label: "Wheels, hubs & drums" },
+  { id: "brakes", label: "Brakes" },
+  { id: "front_susp", label: "Front suspension & steering" },
+  { id: "rear_axle", label: "Rear axle" },
+  { id: "exhaust_rearsusp", label: "Exhaust & rear suspension" },
+  { id: "engine", label: "Engine" },
+  { id: "transmission", label: "Transmission" },
+  { id: "cooling", label: "Cooling system" },
+  { id: "fuel", label: "Fuel system & manifolds" },
+  { id: "electrical", label: "Electrical" },
+  { id: "accessories", label: "Accessories" },
+  { id: "body", label: "Body" },
+  { id: "paint", label: "Paint" },
+  { id: "maintenance", label: "Maintenance" },
+  { id: "other", label: "Other" },
+];
+const CATEGORY_LABEL = Object.fromEntries(CATEGORY_META.map((c) => [c.id, c.label]));
+const CATEGORY_IDS = CATEGORY_META.map((c) => c.id);
+const CAT_CACHE = new Map();
+function categoryText(r) {
+  // Classify from what was actually reported and fixed (the structured ticket
+  // fields and the claim-ready cause/correction) — NOT the AI's free-form
+  // summary/risks, which may mention systems it explicitly ruled out.
+  const parts = [r.ticket];
+  const res = r.result || {};
+  if (res && res.rewrite) parts.push(res.rewrite.complaint, res.rewrite.cause, res.rewrite.correction);
+  if (r.rejection) parts.push(r.rejection);
+  return " " + parts.filter(Boolean).join(" \n ").toLowerCase() + " ";
+}
+function categorizeRepair(r) {
+  if (CAT_CACHE.has(r.id)) return CAT_CACHE.get(r.id);
+  const text = categoryText(r);
+  let cat = "other";
+  for (const def of CAT_DEFS) { if (def.kw.some((k) => text.includes(k))) { cat = def.id; break; } }
+  CAT_CACHE.set(r.id, cat);
+  return cat;
+}
+// Score bands for the History filter. Bottom band is "Under 60" so no score
+// falls through a gap (covers 0-59).
+const SCORE_BANDS = [
+  { id: "90", label: "90 & up", min: 90, max: 100 },
+  { id: "80", label: "80-89", min: 80, max: 89 },
+  { id: "70", label: "70-79", min: 70, max: 79 },
+  { id: "60", label: "60-69", min: 60, max: 69 },
+  { id: "lt60", label: "Under 60", min: 0, max: 59 },
+];
+const SCORE_BAND_BY_ID = Object.fromEntries(SCORE_BANDS.map((b) => [b.id, b]));
+function scoreBandOf(score) {
+  if (score == null) return null;
+  for (const b of SCORE_BANDS) { if (score >= b.min && score <= b.max) return b.id; }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Appeal drafter prompt
 // ---------------------------------------------------------------------------
 const APPEAL_PROMPT = `You are a veteran Ford dealership warranty administrator who writes claim appeals that get PAID. The user gives you (1) the rejection, denial, or chargeback notice from Ford and (2) the original repair order / claim, plus optional images or PDFs of the paperwork.
@@ -914,16 +991,38 @@ app.get("/history", (_req, res) => {
 app.get("/api/history", (req, res) => {
   const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 50));
-  const { matched, records, fallback, needles } = searchHistory(req.query.q, {
+  const { records, fallback, needles } = searchHistory(req.query.q, {
     type: req.query.type === "review" || req.query.type === "appeal" ? req.query.type : null,
     verdict: req.query.verdict ? String(req.query.verdict) : null,
     days: parseInt(req.query.days, 10) || null,
   });
-  const list = records.slice(offset, offset + limit).map((r) => ({
-    id: r.id, ts: r.ts, type: r.type, ro: r.ro, vin: r.vin, vehicle: r.vehicle,
-    score: r.score, verdict: r.verdict, summary: String(r.summary || "").slice(0, 220),
-  }));
-  res.json({ total: HISTORY.length, matched, offset, fallback, needles, results: list });
+  const band = SCORE_BAND_BY_ID[req.query.band] || null;
+  const cat = CATEGORY_IDS.includes(req.query.cat) ? req.query.cat : null;
+  const inBand = (r) => (band ? r.score != null && r.score >= band.min && r.score <= band.max : true);
+  const inCat = (r) => (cat ? categorizeRepair(r) === cat : true);
+
+  // Faceted counts: category counts respect the active band (and vice-versa) so
+  // each dropdown shows how many records that choice would surface right now.
+  const categoryCounts = {}; for (const id of CATEGORY_IDS) categoryCounts[id] = 0;
+  const bandCounts = {}; for (const b of SCORE_BANDS) bandCounts[b.id] = 0;
+  for (const r of records) {
+    if (inBand(r)) categoryCounts[categorizeRepair(r)]++;
+    if (inCat(r)) { const bb = scoreBandOf(r.score); if (bb) bandCounts[bb]++; }
+  }
+
+  const filtered = records.filter((r) => inBand(r) && inCat(r));
+  const list = filtered.slice(offset, offset + limit).map((r) => {
+    const c = categorizeRepair(r);
+    return {
+      id: r.id, ts: r.ts, type: r.type, ro: r.ro, vin: r.vin, vehicle: r.vehicle,
+      score: r.score, verdict: r.verdict, summary: String(r.summary || "").slice(0, 220),
+      category: c, categoryLabel: CATEGORY_LABEL[c], claimLabel: r.claimLabel || "",
+    };
+  });
+  res.json({
+    total: HISTORY.length, matched: filtered.length, offset, fallback, needles, results: list,
+    categoryCounts, bandCounts, categories: CATEGORY_META, bands: SCORE_BANDS,
+  });
 });
 
 app.get("/api/history/:id", (req, res) => {
