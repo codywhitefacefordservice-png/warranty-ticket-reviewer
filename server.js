@@ -260,7 +260,7 @@ function saveHistory() {
 // guaranteed. Bump RUBRIC_VERSION whenever the scoring logic, weights, or
 // system prompt change so previously cached results are invalidated.
 // ---------------------------------------------------------------------------
-const RUBRIC_VERSION = "2026-07-16.1";
+const RUBRIC_VERSION = "2026-07-16.2";
 const REVIEW_CACHE_FILE = path.join(HISTORY_DIR, "review_cache.json");
 const REVIEW_CACHE_CAP = 3000;
 let REVIEW_CACHE = {};
@@ -731,13 +731,60 @@ app.post("/api/appeal", async (req, res) => {
   }
 });
 
+// Assemble the structured repair-order fields into the canonical ticket text
+// that both the AI reviewer and the deterministic cache key work from.
+function assembleTicket(f) {
+  const parts = [
+    "REPAIR ORDER #: " + f.ro + "    LINE: " + f.line,
+    "VIN: " + f.vin + "    MILEAGE: " + f.mileage,
+    "",
+    "COMPLAINT: " + f.complaint,
+    "CAUSE: " + f.cause,
+    "CORRECTION: " + f.correction,
+  ];
+  if (f.detail) parts.push("", "ADDITIONAL REPAIR-ORDER DETAIL:", f.detail);
+  return parts.join("\n").trim();
+}
+
 app.post("/api/review", async (req, res) => {
-  const ticket = String(req.body.ticket || "").trim();
-  if (!ticket) return res.status(400).json({ error: "Paste a ticket first." });
+  const b = req.body || {};
+  const f = {
+    ro: String(b.ro || "").trim(),
+    line: String(b.line || "").trim(),
+    vin: String(b.vin || "").trim().toUpperCase(),
+    mileage: String(b.mileage || "").trim(),
+    complaint: String(b.complaint || "").trim(),
+    cause: String(b.cause || "").trim(),
+    correction: String(b.correction || "").trim(),
+    detail: String(b.detail || "").trim(),
+  };
+  const files = Array.isArray(b.files) ? b.files : [];
+
+  let ticket, vinField;
+  const legacy = String(b.ticket || "").trim();
+  const usingFields = f.ro || f.line || f.vin || f.mileage || f.complaint || f.cause || f.correction;
+  if (usingFields || !legacy) {
+    // Structured mode: every listed field is required before a review runs.
+    const missing = [];
+    if (!f.ro) missing.push("Repair Order #");
+    if (!f.line) missing.push("Line #");
+    if (!f.vin) missing.push("VIN");
+    if (!f.mileage) missing.push("Mileage");
+    if (!f.complaint) missing.push("Complaint");
+    if (!f.cause) missing.push("Cause");
+    if (!f.correction) missing.push("Correction");
+    if (missing.length) return res.status(400).json({ error: "Please fill in all required fields before reviewing: " + missing.join(", ") + "." });
+    ticket = assembleTicket(f);
+    vinField = f.vin;
+  } else {
+    // Legacy free-text ticket (kept for backward compatibility / API callers).
+    ticket = legacy;
+    vinField = extractVin(ticket);
+  }
   if (ticket.length > 60000) return res.status(400).json({ error: "That ticket is too long — trim it down." });
-  const files = Array.isArray(req.body.files) ? req.body.files : [];
+
   try {
-    const vin = extractVin(ticket);
+    const vin = vinField || extractVin(ticket);
     const key = reviewCacheKey("review", ticket, files, "");
     let review, recallInfo;
     const hit = REVIEW_CACHE[key];
@@ -753,7 +800,9 @@ app.post("/api/review", async (req, res) => {
     }
     addHistory({
       type: "review",
-      ro: extractRo(ticket),
+      ro: f.ro || extractRo(ticket),
+      line: f.line || "",
+      mileage: f.mileage || "",
       vin: vin || "",
       vehicle: recallInfo && !recallInfo.error ? (recallInfo.year + " " + recallInfo.make + " " + recallInfo.model) : "",
       score: review?.score ?? null,
