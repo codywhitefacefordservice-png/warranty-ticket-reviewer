@@ -250,6 +250,66 @@ function saveHistory() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Deterministic result cache.
+// The AI, even at temperature 0, can find a different number of gaps/risks on
+// repeat runs of the SAME ticket, which would make the score jump around. That
+// breaks training. So we hash the exact input (ticket text + attached files)
+// and, once a ticket has been reviewed, we always return that first stored
+// result verbatim for any identical resubmission. Same input -> same score,
+// guaranteed. Bump RUBRIC_VERSION whenever the scoring logic, weights, or
+// system prompt change so previously cached results are invalidated.
+// ---------------------------------------------------------------------------
+const RUBRIC_VERSION = "2026-07-16.1";
+const REVIEW_CACHE_FILE = path.join(HISTORY_DIR, "review_cache.json");
+const REVIEW_CACHE_CAP = 3000;
+let REVIEW_CACHE = {};
+try {
+  if (fs.existsSync(REVIEW_CACHE_FILE)) REVIEW_CACHE = JSON.parse(fs.readFileSync(REVIEW_CACHE_FILE, "utf8")) || {};
+  console.log("Review cache: " + Object.keys(REVIEW_CACHE).length + " entr(ies) loaded (rubric " + RUBRIC_VERSION + ")");
+} catch (e) {
+  console.error("Review cache load failed:", e.message);
+  REVIEW_CACHE = {};
+}
+function saveReviewCache() {
+  try {
+    const keys = Object.keys(REVIEW_CACHE);
+    if (keys.length > REVIEW_CACHE_CAP) {
+      keys.sort((a, b) => (REVIEW_CACHE[a].ts || 0) - (REVIEW_CACHE[b].ts || 0));
+      for (const k of keys.slice(0, keys.length - REVIEW_CACHE_CAP)) delete REVIEW_CACHE[k];
+    }
+    const tmp = REVIEW_CACHE_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(REVIEW_CACHE));
+    fs.renameSync(tmp, REVIEW_CACHE_FILE);
+  } catch (e) {
+    console.error("Review cache save failed:", e.message);
+  }
+}
+function filesSignature(files) {
+  const arr = (Array.isArray(files) ? files : []).slice(0, 4).map((f) => ({
+    type: String(f.type || ""),
+    data: String(f.data || ""),
+  }));
+  return crypto.createHash("sha256").update(JSON.stringify(arr)).digest("hex");
+}
+// A stable fingerprint of one submission. Whitespace is normalized so that a
+// re-paste with different trailing spaces/line endings still counts as "the
+// same ticket".
+function normalizeText(t) {
+  return String(t || "").replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ").replace(/[ \t]*\n[ \t]*/g, "\n").trim();
+}
+function reviewCacheKey(kind, ticket, files, extra) {
+  return crypto
+    .createHash("sha256")
+    .update(
+      RUBRIC_VERSION + "|" + kind + "|" +
+      normalizeText(ticket) + "|" +
+      normalizeText(extra) + "|" +
+      filesSignature(files)
+    )
+    .digest("hex");
+}
+
 function extractRo(text) {
   const m = String(text).match(/\bR\.?O\.?\s*[#:\-]?\s*([0-9]{4,10})\b/i);
   return m ? m[1] : "";
@@ -644,7 +704,16 @@ app.post("/api/appeal", async (req, res) => {
   if (rejection.length + ticket.length > 80000) return res.status(400).json({ error: "That's too long — trim it down." });
   const files = Array.isArray(req.body.files) ? req.body.files : [];
   try {
-    const appeal = await draftAppeal(rejection, ticket, files);
+    const key = reviewCacheKey("appeal", ticket, files, rejection);
+    let appeal;
+    const hit = REVIEW_CACHE[key];
+    if (hit && hit.appeal) {
+      appeal = hit.appeal;
+    } else {
+      appeal = await draftAppeal(rejection, ticket, files);
+      REVIEW_CACHE[key] = { appeal, ts: Date.now() };
+      saveReviewCache();
+    }
     addHistory({
       type: "appeal",
       ro: extractRo(rejection + " " + ticket),
@@ -669,8 +738,19 @@ app.post("/api/review", async (req, res) => {
   const files = Array.isArray(req.body.files) ? req.body.files : [];
   try {
     const vin = extractVin(ticket);
-    const recallInfo = vin ? await lookupRecalls(vin) : null;
-    const review = await reviewTicket(ticket, recallInfo, files);
+    const key = reviewCacheKey("review", ticket, files, "");
+    let review, recallInfo;
+    const hit = REVIEW_CACHE[key];
+    if (hit && hit.review) {
+      // Identical ticket seen before -> return the exact same review + score.
+      review = hit.review;
+      recallInfo = hit.recallInfo || null;
+    } else {
+      recallInfo = vin ? await lookupRecalls(vin) : null;
+      review = await reviewTicket(ticket, recallInfo, files);
+      REVIEW_CACHE[key] = { review, recallInfo, ts: Date.now() };
+      saveReviewCache();
+    }
     addHistory({
       type: "review",
       ro: extractRo(ticket),
