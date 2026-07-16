@@ -138,7 +138,8 @@
       <select id="f-claimtype">
         <option value="">Select the claim type…</option>
         <option value="11">11 — Standard vehicle warranty (NVLW)</option>
-        <option value="21">21 — ESP / SPW (service contract)</option>
+        <option value="11-ESP">11 — ESP / service contract (Sub-Code ESP)</option>
+        <option value="21">21 — Service Part Warranty (SPW)</option>
         <option value="31">31 — FSA / Recall</option>
       </select>
       <div class="hint" id="ct-hint" style="margin-top:5px"></div>
@@ -247,7 +248,8 @@ REQUIRED.forEach(([k]) => { const el = $("f-" + k); if (!el) return; el.addEvent
 // Show which rulebook applies as soon as a claim type is picked.
 const CT_HINT = {
   "11": "Reviewed against the New Vehicle Warranty (W&P) + OWS claiming rules.",
-  "21": "Reviewed against Ford/Lincoln Protect ESP rules — deductible, plan coverage, and prior-approval caveats apply on top of the base rules.",
+  "11-ESP": "Reviewed against Ford/Lincoln Protect ESP rules — deductible, plan coverage, and prior-approval caveats apply on top of the base rules.",
+  "21": "Reviewed against Service Part Warranty rules — SPW coverage period, original-RO reference, and part-specific prior approval.",
   "31": "Reviewed as a Field Service Action — must be claimed as the FSA (not warranty), open on OASIS, correct campaign/option code.",
 };
 $("f-claimtype").addEventListener("change", () => { $("ct-hint").textContent = CT_HINT[$("f-claimtype").value] || ""; });
