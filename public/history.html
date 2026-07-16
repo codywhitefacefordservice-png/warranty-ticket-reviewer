@@ -4,106 +4,104 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>History — Warranty Ticket Reviewer</title>
+<title>History — Whiteface Ford</title>
 <style>
   :root{
     color-scheme: light dark;
-    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
-    --grid:#e1e0d9; --border:rgba(11,11,11,.10); --accent:#2a78d6;
-    --good:#0ca30c; --good-ink:#006300; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8;
+    --good:#0a8a3a; --good-ink:#0a7a34; --warning:#b7791f; --serious:#c05621; --critical:#c8102e;
   }
   @media (prefers-color-scheme: dark){
-    :root{ --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
-           --grid:#2c2c2a; --border:rgba(255,255,255,.10); --accent:#3987e5;
-           --good:#0ca30c; --good-ink:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b; }
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442;
+      --good:#38c172; --good-ink:#38c172; --warning:#e0b64a; --serious:#ef9a6a; --critical:#ef5a6f; }
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--page);color:var(--ink);
-       font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-  .wrap{max-width:980px;margin:0 auto;padding:24px 16px 60px}
-  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
-  h1{font-size:22px;margin:0}
-  .sub{color:var(--ink-2);font-size:13px}
-  a{color:var(--accent)}
-  input[type=search]{flex:1;min-width:220px;padding:10px 14px;font-size:15px;border:1px solid var(--border);
-        border-radius:8px;background:var(--surface);color:var(--ink)}
-  input[type=search]:focus{outline:2px solid var(--accent);outline-offset:1px}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px;color:var(--ink)}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  a{color:var(--brand-2)}
+  input[type=search]{flex:1;min-width:220px;padding:10px 14px;font-size:15px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
+  input[type=search]:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
   select{padding:9px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
   .bar{display:flex;gap:10px;align-items:center;margin:12px 0 8px;flex-wrap:wrap}
-  button{padding:10px 18px;font-size:15px;font-weight:600;border:1px solid var(--border);
-         border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
-  button.primary{background:var(--accent);border-color:transparent;color:#fff}
-  button:hover{filter:brightness(1.05)}
-  .hint{color:var(--muted);font-size:13px}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;cursor:pointer}
-  .card:hover{border-color:var(--accent)}
+  button{padding:11px 20px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(16,23,38,.06);transition:border-color .12s ease,box-shadow .12s ease,transform .05s ease,filter .12s ease}
+  button:hover{border-color:var(--brand-2);box-shadow:0 2px 6px rgba(16,23,38,.12)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(0,52,120,.30),inset 0 1px 0 rgba(255,255,255,.15)}
+  button.primary:hover{filter:brightness(1.08);box-shadow:0 5px 12px rgba(0,52,120,.34),inset 0 1px 0 rgba(255,255,255,.15)}
+  .hint{color:var(--muted);font-size:12.5px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:10px;cursor:pointer;box-shadow:0 1px 2px rgba(16,23,38,.04)}
+  .card:hover{border-color:var(--brand-2)}
   .row{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
-  .ro{font-weight:700}
-  .badge{display:inline-flex;padding:2px 10px;border-radius:999px;font-weight:700;font-size:12px}
-  .b-ready{color:var(--good-ink);background:rgba(12,163,12,.12)}
-  .b-needs_work,.b-moderate{color:#8a5a00;background:rgba(250,178,25,.18)}
-  .b-high_risk,.b-weak{color:var(--critical);background:rgba(208,59,59,.12)}
-  .b-strong{color:var(--good-ink);background:rgba(12,163,12,.12)}
-  .b-appeal{color:var(--accent);background:rgba(42,120,214,.12)}
-  @media (prefers-color-scheme: dark){ .b-needs_work,.b-moderate{color:var(--warning)} .b-high_risk,.b-weak{color:#e66767} }
-  .when{color:var(--muted);font-size:12.5px;margin-left:auto}
+  .ro{font-weight:800;color:var(--brand)}
+  @media (prefers-color-scheme: dark){ .ro{color:var(--ink)} }
+  .badge{display:inline-flex;padding:2px 10px;border-radius:6px;font-weight:800;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}
+  .b-ready{color:var(--good-ink);background:rgba(10,138,58,.12)}
+  .b-needs_work,.b-moderate{color:#8a5a00;background:rgba(183,121,31,.16)}
+  .b-high_risk,.b-weak{color:var(--critical);background:rgba(200,16,46,.12)}
+  .b-strong{color:var(--good-ink);background:rgba(10,138,58,.12)}
+  .b-appeal{color:var(--brand-2);background:rgba(10,75,179,.12)}
+  @media (prefers-color-scheme: dark){ .b-needs_work,.b-moderate{color:var(--warning)} .b-high_risk,.b-weak{color:#ef5a6f} }
+  .when{color:var(--muted);font-size:12.5px;margin-left:auto} .sub2{color:var(--ink-2);font-size:13px}
   .snip{color:var(--ink-2);font-size:13.5px;margin-top:4px}
-  mark{background:rgba(250,178,25,.45);color:inherit;border-radius:3px;padding:0 1px}
+  mark{background:rgba(183,121,31,.35);color:inherit;border-radius:3px;padding:0 1px}
   .detail{display:none;margin-top:12px;border-top:1px solid var(--grid);padding-top:12px}
-  .detail pre{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Consolas,monospace;background:var(--page);
-              border:1px solid var(--grid);border-radius:8px;padding:10px 12px;max-height:320px;overflow:auto}
+  .detail pre{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Consolas,monospace;background:var(--page);border:1px solid var(--grid);border-radius:8px;padding:10px 12px;max-height:320px;overflow:auto}
   .kv{margin:6px 0;color:var(--ink-2)} .kv b{color:var(--ink)}
-  .del{font-size:12px;padding:2px 10px;color:var(--critical)}
+  .del{font-size:12px;padding:3px 11px;color:var(--critical)}
   .empty{color:var(--muted);padding:30px 0;text-align:center}
-  .notice{color:#8a5a00;background:rgba(250,178,25,.14);border:1px solid rgba(250,178,25,.4);
-          border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13.5px;display:none}
+  .notice{color:#8a5a00;background:rgba(183,121,31,.14);border:1px solid rgba(183,121,31,.4);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13.5px;display:none}
   @media (prefers-color-scheme: dark){ .notice{color:var(--warning)} }
   details.help{margin:4px 0 16px;font-size:13px;color:var(--ink-2)}
-  details.help summary{cursor:pointer;color:var(--accent);font-weight:600}
-  details.help code{background:var(--surface);border:1px solid var(--grid);border-radius:5px;padding:1px 6px;
-                    font:12px ui-monospace,Consolas,monospace;white-space:nowrap}
+  details.help summary{cursor:pointer;color:var(--brand-2);font-weight:700}
+  details.help code{background:var(--surface);border:1px solid var(--grid);border-radius:5px;padding:1px 6px;font:12px ui-monospace,Consolas,monospace;white-space:nowrap}
   details.help .ex{margin:6px 0}
   #more{display:none;margin:10px auto;display:block}
-  footer{margin-top:22px;color:var(--muted);font-size:12.5px}
+  footer{margin-top:22px;color:var(--muted);font-size:12px}
 </style>
 </head>
 <body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" src="/logo.png" alt="Whiteface Ford" onerror="this.style.display='none';document.getElementById('wordmark').style.display='flex'">
+    <span id="wordmark" class="wordmark"><b>WHITEFACE FORD</b><small>HEREFORD, TEXAS</small></span>
+  </a>
+  <nav class="nav">
+    <a href="/">Reviewer</a>
+    <a href="/appeal">Appeals</a>
+    <a href="/history" class="active">History</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
 <div class="wrap">
-  <header>
-    <div>
-      <h1>📜 History</h1>
-      <div class="sub">Smart search across every saved review and appeal — RO, VIN, keywords, filters, dates.</div>
-    </div>
-    <div class="sub"><a href="/">Ticket reviewer</a> · <a href="/appeal">Appeal drafter</a> · <a href="/logout">Sign out</a></div>
-  </header>
+  <div class="page-title">History</div>
+  <div class="page-sub">Smart search across every saved review and appeal — RO, VIN, keywords, filters, dates.</div>
 
   <div class="bar">
     <input type="search" id="q" placeholder='Search anything — RO, VIN, part number, keywords, "exact phrase", score<50, from:7/1…'>
     <button id="go" class="primary">Search</button>
   </div>
   <div class="bar" style="margin-top:0">
-    <select id="ftype">
-      <option value="">All types</option>
-      <option value="review">🔧 Reviews</option>
-      <option value="appeal">⚖️ Appeals</option>
-    </select>
-    <select id="fverdict">
-      <option value="">Any verdict</option>
-      <option value="ready">✔ Ready</option>
-      <option value="needs_work">⚠ Needs work</option>
-      <option value="high_risk">✖ High risk</option>
-      <option value="strong">💪 Strong appeal</option>
-      <option value="moderate">🤔 Moderate appeal</option>
-      <option value="weak">⚠ Weak appeal</option>
-    </select>
-    <select id="fdays">
-      <option value="">Any time</option>
-      <option value="1">Last 24 hours</option>
-      <option value="7">Last 7 days</option>
-      <option value="30">Last 30 days</option>
-      <option value="90">Last 90 days</option>
-      <option value="365">Last year</option>
-    </select>
+    <select id="ftype"><option value="">All types</option><option value="review">Reviews</option><option value="appeal">Appeals</option></select>
+    <select id="fverdict"><option value="">Any verdict</option><option value="ready">Ready</option><option value="needs_work">Needs work</option><option value="high_risk">High risk</option><option value="strong">Strong appeal</option><option value="moderate">Moderate appeal</option><option value="weak">Weak appeal</option></select>
+    <select id="fdays"><option value="">Any time</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option></select>
     <span class="hint" id="count"></span>
   </div>
 
@@ -127,33 +125,27 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-function esc(s){ return String(s ?? "").replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"}[c])); }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function when(ts){ const d = new Date(ts); return d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}); }
 let offset = 0, needles = [];
-
 function hilite(s){
   let out = esc(s);
-  for (const n of needles){
-    if (!n || n.length < 2) continue;
+  for (const n of needles){ if (!n || n.length < 2) continue;
     try { out = out.replace(new RegExp("(" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi"), "<mark>$1</mark>"); } catch {}
   }
   return out;
 }
-
 function params(){
   const p = new URLSearchParams();
-  const q = $("q").value.trim();
-  if (q) p.set("q", q);
+  const q = $("q").value.trim(); if (q) p.set("q", q);
   if ($("ftype").value) p.set("type", $("ftype").value);
   if ($("fverdict").value) p.set("verdict", $("fverdict").value);
   if ($("fdays").value) p.set("days", $("fdays").value);
   return p;
 }
-
 async function load(append){
   if (!append) offset = 0;
-  const p = params();
-  p.set("offset", offset);
+  const p = params(); p.set("offset", offset);
   const r = await fetch("/api/history?" + p.toString());
   if (r.status === 401){ location.href = "/"; return; }
   const data = await r.json();
@@ -162,29 +154,21 @@ async function load(append){
   $("fallback").style.display = data.fallback ? "block" : "none";
   const html = data.results.map(r => {
     const badge = r.type === "appeal"
-      ? '<span class="badge b-appeal">⚖️ APPEAL</span> <span class="badge b-' + esc(r.verdict) + '">' + esc(r.verdict || "") + "</span>"
+      ? '<span class="badge b-appeal">APPEAL</span> <span class="badge b-' + esc(r.verdict) + '">' + esc(r.verdict || "") + "</span>"
       : '<span class="badge b-' + esc(r.verdict) + '">' + (r.score != null ? r.score + "/100" : "") + " " + esc(String(r.verdict || "").replace("_", " ")) + "</span>";
-    return `<div class="card" data-id="${r.id}">
-      <div class="row">
+    return `<div class="card" data-id="${r.id}"><div class="row">
         <span class="ro">${r.ro ? "RO# " + hilite(r.ro) : "(no RO#)"}</span>
-        ${r.vehicle ? '<span class="sub">' + hilite(r.vehicle) + "</span>" : ""}
-        ${r.vin ? '<span class="sub">' + hilite(r.vin) + "</span>" : ""}
-        ${badge}
-        <span class="when">${when(r.ts)}</span>
-      </div>
-      <div class="snip">${hilite(r.summary)}</div>
-      <div class="detail" id="d-${r.id}"></div>
-    </div>`;
+        ${r.vehicle ? '<span class="sub2">' + hilite(r.vehicle) + "</span>" : ""}
+        ${r.vin ? '<span class="sub2">' + hilite(r.vin) + "</span>" : ""}
+        ${badge}<span class="when">${when(r.ts)}</span></div>
+      <div class="snip">${hilite(r.summary)}</div><div class="detail" id="d-${r.id}"></div></div>`;
   }).join("");
   if (append) $("list").insertAdjacentHTML("beforeend", html);
   else $("list").innerHTML = html || '<div class="empty">' + ($("q").value.trim() ? "No matches — try fewer words, or check the search tricks above." : "Nothing saved yet — run a review and it will appear here.") + "</div>";
   offset += data.results.length;
   $("more").style.display = offset < data.matched ? "block" : "none";
-  [...document.querySelectorAll(".card")].forEach(c => {
-    if (!c.dataset.wired){ c.dataset.wired = "1"; c.addEventListener("click", () => open(c.dataset.id)); }
-  });
+  [...document.querySelectorAll(".card")].forEach(c => { if (!c.dataset.wired){ c.dataset.wired = "1"; c.addEventListener("click", () => open(c.dataset.id)); } });
 }
-
 async function open(id){
   const d = $("d-" + id);
   if (d.style.display === "block"){ d.style.display = "none"; return; }
@@ -207,17 +191,14 @@ async function open(id){
     }
     html += '<button class="del" data-id="' + id + '">Delete this record</button>';
     d.innerHTML = html;
-    d.querySelector(".del").addEventListener("click", async (e) => {
-      e.stopPropagation();
+    d.querySelector(".del").addEventListener("click", async (e) => { e.stopPropagation();
       if (!confirm("Delete this saved record? This can't be undone.")) return;
-      await fetch("/api/history/" + id, { method: "DELETE" });
-      load(false);
+      await fetch("/api/history/" + id, { method: "DELETE" }); load(false);
     });
     [...d.querySelectorAll("pre, .kv")].forEach(el => el.addEventListener("click", e => e.stopPropagation()));
   }
   d.style.display = "block";
 }
-
 $("go").addEventListener("click", () => load(false));
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") load(false); });
 $("more").addEventListener("click", () => load(true));
