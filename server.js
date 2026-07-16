@@ -103,6 +103,49 @@ for (const p of [
 if (!OWS_REFERENCE) console.log("No OWS claiming reference file found.");
 
 // ---------------------------------------------------------------------------
+// Optional distilled Ford/Lincoln Protect (ESP) claiming reference. Only used
+// when the claim type is ESP / service contract. Loaded from (in order):
+// ESP_REFERENCE_FILE env var, Render secret file, or a local esp_reference.md.
+// Kept OUT of the public repo — deploy it as a Render Secret File.
+// ---------------------------------------------------------------------------
+let ESP_REFERENCE = "";
+for (const p of [
+  process.env.ESP_REFERENCE_FILE,
+  "/etc/secrets/esp_reference.md",
+  path.join(__dirname, "esp_reference.md"),
+].filter(Boolean)) {
+  try {
+    if (fs.existsSync(p)) {
+      ESP_REFERENCE = fs.readFileSync(p, "utf8");
+      console.log("Loaded ESP (Ford/Lincoln Protect) reference from " + p + " (" + ESP_REFERENCE.length + " chars)");
+      break;
+    }
+  } catch {}
+}
+if (!ESP_REFERENCE) console.log("No ESP claiming reference file found.");
+
+// Claim-type rulebook: what the reviewer applies on top of the base prompt.
+const CLAIM_TYPES = {
+  "11": { label: "11 — Standard vehicle warranty (NVLW)" },
+  "21": { label: "21 — ESP / SPW (service contract)" },
+  "31": { label: "31 — FSA / Recall" },
+};
+function claimTypeAddendum(claimType) {
+  const ct = String(claimType || "");
+  if (ct === "21") {
+    return "\n\n=== CLAIM TYPE: 21 — ESP / SERVICE CONTRACT (Ford Protect / Lincoln Protect) ===\n" +
+      "This claim is under a paid Ford Protect / Lincoln Protect service contract (ESP) or Service Part Warranty — NOT the base New Vehicle Limited Warranty. Coverage, the deductible, prior-approval thresholds, the submission window, parts-markup caps, and rental/loaner rules are governed by the CONTRACT and the ESP manual below, applied ON TOP OF the base rules. Actively check: which plan is in force (PremiumCARE / ExtraCARE / BaseCARE / PowertrainCARE / Powertrain Wrap / EV / Maintenance / CPO / Blue Advantage, etc.) and whether the repaired component is actually covered under THAT plan and tier; that the contract is in force by time, miles AND engine hours and is not cancelled; that the correct deductible is applied; that prior approval was obtained where the ESP dollar thresholds require it; and the correct ESP claim type / sub-code. Treat a missing/incorrect deductible, an uncovered component, an out-of-force contract, or a missing ESP prior approval as CRITICAL. Cite ESP manual pages (e.g. \"per ESP 11:24\")." +
+      (ESP_REFERENCE ? "\n\n=== FORD/LINCOLN PROTECT (ESP) CLAIMING REFERENCE ===\n" + ESP_REFERENCE : "");
+  }
+  if (ct === "31") {
+    return "\n\n=== CLAIM TYPE: 31 — FIELD SERVICE ACTION (RECALL / CSP / FSA) ===\n" +
+      "This is a Field Service Action (recall / customer satisfaction program / FSA) claim. It MUST be claimed as the FSA — never coded as ordinary warranty. Actively check: the FSA/campaign is OPEN on THIS VIN per OASIS; the correct campaign number and FSA option code are used; parts and labor match the FSA/TSB instructions exactly; any related (collateral) damage is on a SEPARATE repair line and usually needs SSSC prior approval; and recall labor is not padded with unrelated actual time. Apply the recall/FSA claiming rules from the OWS reference. Treat coding a recall as warranty, a closed/again-claimed campaign, or a wrong option code as CRITICAL.";
+  }
+  return "\n\n=== CLAIM TYPE: 11 — STANDARD VEHICLE WARRANTY (NVLW) ===\n" +
+    "This claim is under the New Vehicle Limited Warranty. Coverage is governed by the vehicle's warranty periods in the W&P reference — verify the concern is within coverage by age/mileage and is a defect (not wear, maintenance, or abuse). Apply the standard warranty documentation and OWS claiming rules.";
+}
+
+// ---------------------------------------------------------------------------
 // The review prompt
 // ---------------------------------------------------------------------------
 const SYSTEM_PROMPT = `You are an experienced Ford dealership warranty administrator reviewing warranty repair-order documentation BEFORE the claim is submitted. You know Ford's warranty documentation expectations cold: the 3 Cs (Concern/Complaint, Cause, Correction), causal part identification, labor operations, actual/punch time, diagnostic path with test results (including OASIS/PTS checks and pinpoint tests where relevant), mileage and dates, VIN, prior-approval thresholds, and the classic audit red flags.
@@ -285,7 +328,7 @@ function saveHistory() {
 // guaranteed. Bump RUBRIC_VERSION whenever the scoring logic, weights, or
 // system prompt change so previously cached results are invalidated.
 // ---------------------------------------------------------------------------
-const RUBRIC_VERSION = "2026-07-16.3";
+const RUBRIC_VERSION = "2026-07-16.4";
 const REVIEW_CACHE_FILE = path.join(HISTORY_DIR, "review_cache.json");
 const REVIEW_CACHE_CAP = 3000;
 let REVIEW_CACHE = {};
@@ -628,7 +671,7 @@ function finalizeReview(out) {
   return out;
 }
 
-async function reviewTicket(ticket, recallInfo, files) {
+async function reviewTicket(ticket, recallInfo, files, claimType) {
   if (MOCK) return finalizeReview(JSON.parse(JSON.stringify(MOCK_REVIEW)));
   const blocks = fileBlocks(files);
   const intro = blocks.length
@@ -649,7 +692,7 @@ async function reviewTicket(ticket, recallInfo, files) {
       model: "claude-sonnet-4-5",
       max_tokens: 4000,
       temperature: 0,
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT + claimTypeAddendum(claimType),
       messages: [{ role: "user", content }],
     }),
   });
@@ -762,7 +805,9 @@ app.post("/api/appeal", async (req, res) => {
 // Assemble the structured repair-order fields into the canonical ticket text
 // that both the AI reviewer and the deterministic cache key work from.
 function assembleTicket(f) {
+  const ctLabel = (CLAIM_TYPES[f.claimType] && CLAIM_TYPES[f.claimType].label) || f.claimType;
   const parts = [
+    "CLAIM TYPE: " + ctLabel,
     "REPAIR ORDER #: " + f.ro + "    LINE: " + f.line,
     "VIN: " + f.vin + "    MILEAGE: " + f.mileage,
     "",
@@ -777,6 +822,7 @@ function assembleTicket(f) {
 app.post("/api/review", async (req, res) => {
   const b = req.body || {};
   const f = {
+    claimType: String(b.claimtype || b.claimType || "").trim(),
     ro: String(b.ro || "").trim(),
     line: String(b.line || "").trim(),
     vin: String(b.vin || "").trim().toUpperCase(),
@@ -790,10 +836,11 @@ app.post("/api/review", async (req, res) => {
 
   let ticket, vinField;
   const legacy = String(b.ticket || "").trim();
-  const usingFields = f.ro || f.line || f.vin || f.mileage || f.complaint || f.cause || f.correction;
+  const usingFields = f.claimType || f.ro || f.line || f.vin || f.mileage || f.complaint || f.cause || f.correction;
   if (usingFields || !legacy) {
     // Structured mode: every listed field is required before a review runs.
     const missing = [];
+    if (!f.claimType) missing.push("Claim Type");
     if (!f.ro) missing.push("Repair Order #");
     if (!f.line) missing.push("Line #");
     if (!f.vin) missing.push("VIN");
@@ -802,6 +849,7 @@ app.post("/api/review", async (req, res) => {
     if (!f.cause) missing.push("Cause");
     if (!f.correction) missing.push("Correction");
     if (missing.length) return res.status(400).json({ error: "Please fill in all required fields before reviewing: " + missing.join(", ") + "." });
+    if (!CLAIM_TYPES[f.claimType]) return res.status(400).json({ error: "Unknown claim type." });
     ticket = assembleTicket(f);
     vinField = f.vin;
   } else {
@@ -813,7 +861,9 @@ app.post("/api/review", async (req, res) => {
 
   try {
     const vin = vinField || extractVin(ticket);
-    const key = reviewCacheKey("review", ticket, files, "");
+    // Claim type is part of the cache key: the same repair on a different claim
+    // type is a different review, so it must never collide in the cache.
+    const key = reviewCacheKey("review", ticket, files, "ct:" + (f.claimType || ""));
     let review, recallInfo;
     const hit = REVIEW_CACHE[key];
     if (hit && hit.review) {
@@ -822,12 +872,14 @@ app.post("/api/review", async (req, res) => {
       recallInfo = hit.recallInfo || null;
     } else {
       recallInfo = vin ? await lookupRecalls(vin) : null;
-      review = await reviewTicket(ticket, recallInfo, files);
+      review = await reviewTicket(ticket, recallInfo, files, f.claimType);
       REVIEW_CACHE[key] = { review, recallInfo, ts: Date.now() };
       saveReviewCache();
     }
     addHistory({
       type: "review",
+      claimType: f.claimType || "",
+      claimLabel: (CLAIM_TYPES[f.claimType] && CLAIM_TYPES[f.claimType].label) || "",
       ro: f.ro || extractRo(ticket),
       line: f.line || "",
       mileage: f.mileage || "",
