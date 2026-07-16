@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>History — Warranty Ticket Reviewer</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --border:rgba(11,11,11,.10); --accent:#2a78d6;
+    --good:#0ca30c; --good-ink:#006300; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+           --grid:#2c2c2a; --border:rgba(255,255,255,.10); --accent:#3987e5;
+           --good:#0ca30c; --good-ink:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+       font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:24px 16px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  h1{font-size:22px;margin:0}
+  .sub{color:var(--ink-2);font-size:13px}
+  a{color:var(--accent)}
+  input[type=search]{flex:1;min-width:220px;padding:10px 14px;font-size:15px;border:1px solid var(--border);
+        border-radius:8px;background:var(--surface);color:var(--ink)}
+  input[type=search]:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .bar{display:flex;gap:10px;align-items:center;margin:12px 0 20px;flex-wrap:wrap}
+  button{padding:10px 18px;font-size:15px;font-weight:600;border:1px solid var(--border);
+         border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
+  button.primary{background:var(--accent);border-color:transparent;color:#fff}
+  button:hover{filter:brightness(1.05)}
+  .hint{color:var(--muted);font-size:13px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;cursor:pointer}
+  .card:hover{border-color:var(--accent)}
+  .row{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .ro{font-weight:700}
+  .badge{display:inline-flex;padding:2px 10px;border-radius:999px;font-weight:700;font-size:12px}
+  .b-ready{color:var(--good-ink);background:rgba(12,163,12,.12)}
+  .b-needs_work,.b-moderate{color:#8a5a00;background:rgba(250,178,25,.18)}
+  .b-high_risk,.b-weak{color:var(--critical);background:rgba(208,59,59,.12)}
+  .b-strong{color:var(--good-ink);background:rgba(12,163,12,.12)}
+  .b-appeal{color:var(--accent);background:rgba(42,120,214,.12)}
+  @media (prefers-color-scheme: dark){ .b-needs_work,.b-moderate{color:var(--warning)} .b-high_risk,.b-weak{color:#e66767} }
+  .when{color:var(--muted);font-size:12.5px;margin-left:auto}
+  .snip{color:var(--ink-2);font-size:13.5px;margin-top:4px}
+  .detail{display:none;margin-top:12px;border-top:1px solid var(--grid);padding-top:12px}
+  .detail pre{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Consolas,monospace;background:var(--page);
+              border:1px solid var(--grid);border-radius:8px;padding:10px 12px;max-height:320px;overflow:auto}
+  .kv{margin:6px 0;color:var(--ink-2)} .kv b{color:var(--ink)}
+  .del{font-size:12px;padding:2px 10px;color:var(--critical)}
+  .empty{color:var(--muted);padding:30px 0;text-align:center}
+  footer{margin-top:22px;color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>📜 History</h1>
+      <div class="sub">Every review and appeal run through the tool, searchable by RO number, VIN, or keywords.</div>
+    </div>
+    <div class="sub"><a href="/">Ticket reviewer</a> · <a href="/appeal">Appeal drafter</a> · <a href="/logout">Sign out</a></div>
+  </header>
+
+  <div class="bar">
+    <input type="search" id="q" placeholder="Search — RO number, VIN, customer, part, 'degas bottle', 'punch time'…">
+    <button id="go" class="primary">Search</button>
+    <span class="hint" id="count"></span>
+  </div>
+
+  <div id="list"></div>
+
+  <footer>Stored on the tool's private disk, behind the access code. Newest first, up to 50 results shown.</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s){ return String(s ?? "").replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"}[c])); }
+function when(ts){ const d = new Date(ts); return d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}); }
+
+async function load(){
+  const q = $("q").value.trim();
+  const r = await fetch("/api/history" + (q ? "?q=" + encodeURIComponent(q) : ""));
+  if (r.status === 401){ location.href = "/"; return; }
+  const data = await r.json();
+  $("count").textContent = data.results.length + " shown · " + data.total + " total saved";
+  if (!data.results.length){
+    $("list").innerHTML = '<div class="empty">' + (q ? "No matches. Try fewer or different words." : "Nothing saved yet — run a review and it will appear here.") + "</div>";
+    return;
+  }
+  $("list").innerHTML = data.results.map(r => {
+    const badge = r.type === "appeal"
+      ? '<span class="badge b-appeal">⚖️ APPEAL</span> <span class="badge b-' + esc(r.verdict) + '">' + esc(r.verdict || "") + "</span>"
+      : '<span class="badge b-' + esc(r.verdict) + '">' + (r.score != null ? r.score + "/100" : "") + " " + esc(String(r.verdict || "").replace("_", " ")) + "</span>";
+    return `<div class="card" data-id="${r.id}">
+      <div class="row">
+        <span class="ro">${r.ro ? "RO# " + esc(r.ro) : "(no RO#)"}</span>
+        ${r.vehicle ? '<span class="sub">' + esc(r.vehicle) + "</span>" : ""}
+        ${r.vin ? '<span class="sub">' + esc(r.vin) + "</span>" : ""}
+        ${badge}
+        <span class="when">${when(r.ts)}</span>
+      </div>
+      <div class="snip">${esc(r.summary)}</div>
+      <div class="detail" id="d-${r.id}"></div>
+    </div>`;
+  }).join("");
+  [...document.querySelectorAll(".card")].forEach(c => c.addEventListener("click", () => open(c.dataset.id)));
+}
+
+async function open(id){
+  const d = $("d-" + id);
+  if (d.style.display === "block"){ d.style.display = "none"; return; }
+  if (!d.innerHTML){
+    const r = await fetch("/api/history/" + id);
+    const { record } = await r.json();
+    let html = "";
+    if (record.type === "review"){
+      const rv = record.result || {};
+      html += '<div class="kv"><b>Checklist:</b> ' + (rv.completeness || []).map(c => esc(c.status.toUpperCase() + " " + c.item)).join(" · ") + "</div>";
+      html += '<div class="kv"><b>Risks:</b> ' + ((rv.risks || []).map(x => esc(x.severity.toUpperCase() + ": " + x.flag)).join(" · ") || "none") + "</div>";
+      if (rv.rewrite) html += '<div class="kv"><b>Write-up:</b></div><pre>' + esc("COMPLAINT: " + rv.rewrite.complaint + "\n\nCAUSE: " + rv.rewrite.cause + "\n\nCORRECTION: " + rv.rewrite.correction) + "</pre>";
+      html += '<div class="kv"><b>Original ticket:</b></div><pre>' + esc(record.ticket) + "</pre>";
+    } else {
+      const a = record.result || {};
+      html += '<div class="kv"><b>Assessment:</b> ' + esc((a.analysis?.code || "") + " — " + (a.analysis?.recommendation || "")) + "</div>";
+      if (a.letter) html += '<div class="kv"><b>Appeal letter:</b></div><pre>' + esc(a.letter) + "</pre>";
+      html += '<div class="kv"><b>Rejection notice:</b></div><pre>' + esc(record.rejection) + "</pre>";
+      if (record.ticket) html += '<div class="kv"><b>Original claim:</b></div><pre>' + esc(record.ticket) + "</pre>";
+    }
+    html += '<button class="del" data-id="' + id + '">Delete this record</button>';
+    d.innerHTML = html;
+    d.querySelector(".del").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm("Delete this saved record? This can't be undone.")) return;
+      await fetch("/api/history/" + id, { method: "DELETE" });
+      load();
+    });
+    [...d.querySelectorAll("pre, .kv")].forEach(el => el.addEventListener("click", e => e.stopPropagation()));
+  }
+  d.style.display = "block";
+}
+
+$("go").addEventListener("click", load);
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") load(); });
+load();
+</script>
+</body>
+</html>
