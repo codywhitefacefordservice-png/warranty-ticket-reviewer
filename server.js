@@ -801,6 +801,30 @@ app.use(express.urlencoded({ extended: false }));
 
 const LOGIN_PAGE = fs.readFileSync(path.join(__dirname, "public", "login.html"), "utf8");
 
+// ---------------------------------------------------------------------------
+// Resources: the reference PDF manuals, stored on the persistent disk and
+// served ONLY behind the access code (Ford copyrighted material — never public).
+// Populated once via a token-gated upload; the admin token is derived from the
+// access code, so no extra secret is needed.
+// ---------------------------------------------------------------------------
+const RESOURCES_DIR = path.join(HISTORY_DIR, "resources");
+try { fs.mkdirSync(RESOURCES_DIR, { recursive: true }); } catch {}
+const RESOURCE_ADMIN_TOKEN = crypto.createHmac("sha256", AUTH_SECRET).update("resource-admin").digest("hex");
+const RESOURCES = [
+  { key: "wp",  file: "Ford_Warranty_and_Policy_Manual.pdf",            title: "Warranty & Policy Manual",                   topic: "Warranty & Policy",            desc: "Ford's Warranty & Policy Manual (USA) — coverage periods, documentation standards, prior approval, time recording, and chargebacks." },
+  { key: "ows", file: "OWS_Claiming_User_Guide.pdf",                    title: "OWS Claiming User Guide",                    topic: "Claim Submission (OWS)",       desc: "How to prepare, code, and submit a warranty claim in the Online Warranty System — required fields, causal parts, condition codes, exception codes." },
+  { key: "esp", file: "Ford_Lincoln_Protect_Administration_Manual.pdf", title: "Ford/Lincoln Protect Administration Manual", topic: "Extended Service Plans (ESP)", desc: "ESP / service-contract plans — coverage, deductibles, prior approval, and ESP-specific claim rules." },
+];
+const RESOURCE_BY_KEY = Object.fromEntries(RESOURCES.map((r) => [r.key, r]));
+function resourcePath(r) { return path.join(RESOURCES_DIR, r.file); }
+function resourceMeta() {
+  return RESOURCES.map((r) => {
+    let bytes = 0, available = false;
+    try { bytes = fs.statSync(resourcePath(r)).size; available = bytes > 0; } catch {}
+    return { key: r.key, title: r.title, topic: r.topic, desc: r.desc, file: r.file, available, bytes };
+  });
+}
+
 // Dealership logo, embedded so every page (incl. login) can show it without an extra file.
 let LOGO_B64 = "";
 try { LOGO_B64 = require("./logo.js"); } catch (e) { console.log("logo.js not found - logo disabled"); }
@@ -837,12 +861,36 @@ app.get("/logout", (_req, res) => {
   res.redirect("/");
 });
 
+// Admin-only upload to populate a resource PDF onto the disk. Token-gated so it
+// does not require a login cookie; used once to load the manuals.
+app.put("/resources/upload/:key", express.raw({ type: ["application/pdf", "application/octet-stream"], limit: "60mb" }), (req, res) => {
+  if (!RESOURCE_ADMIN_TOKEN || req.get("x-admin-token") !== RESOURCE_ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
+  const r = RESOURCE_BY_KEY[req.params.key];
+  if (!r) return res.status(404).json({ error: "unknown resource key" });
+  if (!req.body || !req.body.length) return res.status(400).json({ error: "empty body" });
+  try { fs.writeFileSync(resourcePath(r), req.body); }
+  catch (e) { return res.status(500).json({ error: e.message }); }
+  res.json({ ok: true, key: r.key, bytes: req.body.length });
+});
+
 app.use((req, res, next) => {
   if (isAuthed(req)) return next();
-  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history") && req.method === "GET") {
+  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history" || req.path === "/resources") && req.method === "GET") {
     return res.send(LOGIN_PAGE.replace("<!--MSG-->", ""));
   }
   return res.status(401).json({ error: "not logged in" });
+});
+
+app.get("/resources", (_req, res) => res.sendFile(path.join(__dirname, "public", "resources.html")));
+app.get("/api/resources", (_req, res) => res.json({ resources: resourceMeta() }));
+app.get("/resources/file/:key", (req, res) => {
+  const r = RESOURCE_BY_KEY[req.params.key];
+  if (!r) return res.status(404).send("Not found");
+  const p = resourcePath(r);
+  if (!fs.existsSync(p)) return res.status(404).send("This manual hasn't been uploaded yet.");
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", (req.query.dl ? "attachment" : "inline") + '; filename="' + r.file + '"');
+  fs.createReadStream(p).pipe(res);
 });
 
 app.get("/", (_req, res) => {
