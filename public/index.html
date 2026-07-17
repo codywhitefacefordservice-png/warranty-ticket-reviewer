@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Warranty Ticket Reviewer — Whiteface Ford</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8;
+    --good:#0a8a3a; --good-ink:#0a7a34; --warning:#b7791f; --serious:#c05621; --critical:#c8102e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442;
+      --good:#38c172; --good-ink:#38c172; --warning:#e0b64a; --serious:#ef9a6a; --critical:#ef5a6f; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px;color:var(--ink);letter-spacing:.01em}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  h2{font-size:14px;margin:0 0 12px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--brand)}
+  @media (prefers-color-scheme: dark){ h2{color:var(--brand-2)} }
+  a{color:var(--brand-2)}
+  textarea{width:100%;min-height:220px;padding:14px;font:13.5px/1.5 ui-monospace,Consolas,monospace;
+           border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);resize:vertical}
+  textarea:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  /* structured input form */
+  .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+  @media (max-width:640px){ .fgrid{grid-template-columns:1fr 1fr} }
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:11.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+  .req{color:var(--critical)}
+  .opt{color:var(--muted);text-transform:none;letter-spacing:0;font-weight:600}
+  input,select{width:100%;padding:10px 12px;font:14.5px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
+  select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%238a94a6' d='M3 4.5l3 3 3-3'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+  input:focus,select:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  .field.bad select{border-color:var(--critical);outline-color:var(--critical)}
+  textarea.c3{min-height:64px;font-size:14px}
+  #f-detail{min-height:120px}
+  .field.bad input,.field.bad textarea{border-color:var(--critical);outline-color:var(--critical)}
+  .field.bad label{color:var(--critical)}
+  .rerun-note{color:var(--brand);background:rgba(0,52,120,.08);border:1px solid rgba(0,52,120,.28);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;font-weight:600}
+  @media (prefers-color-scheme: dark){ .rerun-note{color:var(--brand-2);background:rgba(91,141,239,.12);border-color:rgba(91,141,239,.35)} }
+  .bar{display:flex;gap:10px;align-items:center;margin:12px 0 24px;flex-wrap:wrap}
+  button{padding:11px 20px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(16,23,38,.06);transition:border-color .12s ease,box-shadow .12s ease,transform .05s ease,filter .12s ease}
+  button:hover{border-color:var(--brand-2);box-shadow:0 2px 6px rgba(16,23,38,.12)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(0,52,120,.30),inset 0 1px 0 rgba(255,255,255,.15)}
+  button.primary:hover{filter:brightness(1.08);box-shadow:0 5px 12px rgba(0,52,120,.34),inset 0 1px 0 rgba(255,255,255,.15)}
+  button:disabled{opacity:.55;cursor:wait;box-shadow:none;transform:none}
+  .hint{color:var(--muted);font-size:12.5px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,23,38,.04)}
+  #results{display:none}
+  .verdict{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .scorewrap{display:flex;align-items:center;gap:14px}
+  .score{font-size:44px;font-weight:800;line-height:1;color:var(--brand)}
+  @media (prefers-color-scheme: dark){ .score{color:var(--ink)} }
+  .score small{font-size:15px;font-weight:600;color:var(--muted)}
+  .vpill{display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:6px;font-weight:800;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+  .v-ready{color:var(--good-ink);background:rgba(10,138,58,.12)}
+  .v-needs_work{color:#8a5a00;background:rgba(183,121,31,.16)}
+  .v-high_risk{color:var(--critical);background:rgba(200,16,46,.12)}
+  @media (prefers-color-scheme: dark){ .v-needs_work{color:var(--warning)} .v-high_risk{color:#ef5a6f} }
+  .summary{margin:10px 0 0;color:var(--ink-2)}
+  ul.checklist{list-style:none;margin:0;padding:0}
+  ul.checklist li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--grid);align-items:baseline}
+  ul.checklist li:last-child{border-bottom:0}
+  .st{flex:0 0 92px;font-weight:800;font-size:12px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+  .st.ok{color:var(--good-ink)} .st.missing{color:var(--critical)} .st.unclear{color:#8a5a00}
+  @media (prefers-color-scheme: dark){ .st.unclear{color:var(--warning)} }
+  .ci{font-weight:700} .cn{color:var(--ink-2);font-size:13.5px}
+  .risk{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--grid)}
+  .risk:last-child{border-bottom:0}
+  .sev{flex:0 0 96px;font-weight:800;font-size:12px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+  .sev.critical{color:var(--critical)} .sev.serious{color:var(--serious)} .sev.warning{color:#8a5a00}
+  @media (prefers-color-scheme: dark){ .sev.warning{color:var(--warning)} }
+  .rf{font-weight:700} .rd{color:var(--ink-2);font-size:13.5px}
+  /* score breakdown */
+  .bd-head{display:flex;align-items:center;gap:10px;color:var(--ink-2);font-size:13.5px;margin-bottom:6px}
+  .bd-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--grid);align-items:baseline}
+  .bd-row:last-of-type{border-bottom:0}
+  .pts{flex:0 0 46px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;font-size:14px}
+  .pts.missing,.pts.critical{color:var(--critical)} .pts.unclear,.pts.warning{color:#8a5a00} .pts.serious{color:var(--serious)}
+  @media (prefers-color-scheme: dark){ .pts.unclear,.pts.warning{color:var(--warning)} }
+  .bd-label{font-weight:700} .bd-fix{color:var(--ink-2);font-size:13px;margin-top:1px}
+  .bd-total{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:2px solid var(--border);font-weight:800}
+  .bd-total .big{font-size:20px;color:var(--brand)}
+  @media (prefers-color-scheme: dark){ .bd-total .big{color:var(--ink)} }
+  .bd-perfect{color:var(--good-ink);font-weight:700;padding:6px 0}
+  .rw{margin:0 0 12px} .rw:last-child{margin:0}
+  .rw .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;align-items:center;font-weight:700}
+  .rw .t{background:var(--page);border:1px solid var(--grid);border-radius:8px;padding:10px 12px;margin-top:4px;font-size:14px;white-space:pre-wrap}
+  .copy{font-size:12px;padding:3px 11px;font-weight:700}
+  ul.qs{margin:0;padding-left:20px;color:var(--ink-2)} ul.qs li{margin:4px 0}
+  .error{display:none;color:var(--critical);background:rgba(200,16,46,.08);border:1px solid rgba(200,16,46,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px}
+  footer{margin-top:22px;color:var(--muted);font-size:12px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" alt="" style="display:none">
+    <span id="wordmark" class="wordmark"><b></b><small></small></span>
+  </a>
+  <nav class="nav">
+    <a href="/" class="active">Reviewer</a>
+    <a href="/appeal">Appeals</a>
+    <a href="/history">History</a>
+    <a href="/resources">Resources</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">Warranty Ticket Reviewer</div>
+  <div class="page-sub">Enter the repair-order details for a documentation review, risk check, and claim-ready write-up before submission. Fields marked <span class="req">*</span> are required.</div>
+
+  <div id="rerun-note" class="rerun-note" style="display:none"></div>
+
+  <div class="card" id="inputcard">
+    <div class="field"><label for="f-claimtype">Claim Type <span class="req">*</span></label>
+      <select id="f-claimtype">
+        <option value="">Select the claim type…</option>
+        <option value="11">11 — Standard vehicle warranty (NVLW)</option>
+        <option value="11-ESP">11 — ESP / service contract (Sub-Code ESP)</option>
+        <option value="21">21 — Service Part Warranty (SPW)</option>
+        <option value="31">31 — FSA / Recall</option>
+      </select>
+      <div class="hint" id="ct-hint" style="margin-top:5px"></div>
+    </div>
+    <div class="fgrid">
+      <div class="field"><label for="f-ro">Repair Order # <span class="req">*</span></label><input id="f-ro" autocomplete="off" placeholder="e.g. 771902"></div>
+      <div class="field"><label for="f-line">Line # <span class="req">*</span></label><input id="f-line" autocomplete="off" placeholder="e.g. A"></div>
+      <div class="field"><label for="f-vin">VIN <span class="req">*</span></label><input id="f-vin" autocomplete="off" maxlength="17" placeholder="17-character VIN" style="text-transform:uppercase"></div>
+      <div class="field"><label for="f-mileage">Mileage In <span class="req">*</span></label><input id="f-mileage" autocomplete="off" inputmode="numeric" placeholder="odometer at write-up"></div>
+      <div class="field"><label for="f-mileageout">Mileage Out <span class="req">*</span></label><input id="f-mileageout" autocomplete="off" inputmode="numeric" placeholder="odometer at completion"></div>
+      <div class="field"><label for="f-causalpart">Causal Part # <span class="req">*</span></label><input id="f-causalpart" autocomplete="off" placeholder="part number (or NPF)" style="text-transform:uppercase"></div>
+    </div>
+    <div id="spw-fields" class="fgrid" style="display:none">
+      <div class="field"><label for="f-origro">Original RO / Invoice # <span class="opt">(SPW)</span></label><input id="f-origro" autocomplete="off" placeholder="original RO or invoice # of the part install"></div>
+      <div class="field"><label for="f-spwinstall">SPW Install Date <span class="opt">(SPW)</span></label><input id="f-spwinstall" type="date" autocomplete="off"></div>
+      <div class="field"><label for="f-spwapproval">SPW Prior Approval # <span class="opt">(SPWA — if applicable)</span></label><input id="f-spwapproval" autocomplete="off" placeholder="SPWA authorization # (e.g. SPWA12345)"></div>
+    </div>
+    <div class="field"><label for="f-complaint">Complaint — customer concern <span class="req">*</span></label><textarea id="f-complaint" class="c3" placeholder="What the customer reported."></textarea></div>
+    <div class="field"><label for="f-cause">Cause <span class="req">*</span></label><textarea id="f-cause" class="c3" placeholder="What was found to be causing it — the causal part / condition."></textarea></div>
+    <div class="field"><label for="f-correction">Correction <span class="req">*</span></label><textarea id="f-correction" class="c3" placeholder="What was done to fix it."></textarea></div>
+    <div class="field"><label for="f-detail">Additional repair-order detail <span class="opt">(optional — improves the review)</span></label><textarea id="f-detail" placeholder="Diagnosis path & test results, labor op & punch time, parts, sublet, hard-card notes… the more detail, the sharper the risk check."></textarea></div>
+  </div>
+  <input type="file" id="files" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple style="display:none">
+  <div class="bar">
+    <button id="go" class="primary">Review ticket</button>
+    <button id="attach">Attach hard card</button>
+    <button id="clear">Clear</button>
+    <span class="hint">Photos or PDF of the physical RO hard card (punches, initials, signatures). Reviews are saved to History.</span>
+  </div>
+  <div id="filelist" class="bar" style="margin-top:-14px"></div>
+
+  <div id="err" class="error"></div>
+
+  <div id="results">
+    <div class="card verdict">
+      <div class="scorewrap">
+        <div class="score" id="r-score">–<small>/100</small></div>
+        <span class="vpill" id="r-verdict"></span>
+      </div>
+      <p class="summary" id="r-summary" style="flex:1;min-width:240px"></p>
+    </div>
+
+    <div class="card" id="bdcard">
+      <h2>How this score was calculated</h2>
+      <div class="bd-head">Every claim starts at 100. Points come off for each documentation gap or risk the review found — the same findings always produce the same score. Fix the items below to raise it toward 100.</div>
+      <div id="bd-body"></div>
+    </div>
+
+    <div class="card">
+      <h2>Documentation completeness</h2>
+      <ul class="checklist" id="r-check"></ul>
+    </div>
+
+    <div class="card" id="riskcard">
+      <h2>Rejection &amp; audit risks</h2>
+      <div id="r-risks"></div>
+    </div>
+
+    <div class="card" id="recallcard" style="display:none">
+      <h2>Recalls on file (NHTSA)</h2>
+      <div class="hint" id="recall-veh" style="margin-bottom:8px"></div>
+      <div id="r-recalls"></div>
+      <div class="hint" style="margin-top:8px">Campaigns listed for this year/make/model from the federal NHTSA database. Check OASIS to confirm which are still open on this VIN. Recalls are claimed as recalls — never coded as warranty.</div>
+    </div>
+
+    <div class="card">
+      <h2>Claim-ready write-up</h2>
+      <div class="rw"><div class="k"><span>Complaint</span><button class="copy" data-t="complaint">Copy</button></div><div class="t" id="rw-complaint"></div></div>
+      <div class="rw"><div class="k"><span>Cause</span><button class="copy" data-t="cause">Copy</button></div><div class="t" id="rw-cause"></div></div>
+      <div class="rw"><div class="k"><span>Correction</span><button class="copy" data-t="correction">Copy</button></div><div class="t" id="rw-correction"></div></div>
+      <div class="hint" style="margin-top:8px">Bracketed items like [ADD PUNCH TIME] are facts the AI wouldn't invent — fill them in from the RO.</div>
+    </div>
+
+    <div class="card" id="qcard">
+      <h2>Answer before you submit</h2>
+      <ul class="qs" id="r-questions"></ul>
+    </div>
+  </div>
+
+  <footer>AI-assisted review — a second set of eyes, not official Ford guidance. Please consult your service manager and warranty administrator for further guidance.</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const VLABEL = { ready: "Looks claim-ready", needs_work: "Needs work", high_risk: "High risk" };
+const SLABEL = { ok: "OK", missing: "MISSING", unclear: "UNCLEAR" };
+const SEVLBL = { critical: "CRITICAL", serious: "SERIOUS", warning: "WARNING" };
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+let attached = [];
+const MAXF = 4;
+const MAX_ORIGINAL_MB = 60;    // only reject absurdly large originals
+const COMPRESS_OVER_MB = 1.2;  // shrink any photo bigger than this
+const IMG_MAX_EDGE = 2000, IMG_QUALITY = 0.72;
+$("attach").addEventListener("click", () => $("files").click());
+
+function readBase64(f){
+  return new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result).split(",")[1]); rd.onerror = rej; rd.readAsDataURL(f); });
+}
+// Downscale + JPEG-compress a large photo in the browser BEFORE it is uploaded,
+// so a ~30MB phone photo becomes a few hundred KB. Enough detail to spot major
+// issues, far smaller to upload and store. PDFs and already-small images are
+// sent unchanged; if anything goes wrong we fall back to the original file.
+async function fileToAttachment(f){
+  const isImg = /^image\//.test(f.type);
+  const small = f.size <= COMPRESS_OVER_MB * 1024 * 1024;
+  if (!isImg || small || f.type === "image/gif"){
+    return { name: f.name, type: f.type, data: await readBase64(f) };
+  }
+  try {
+    const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
+    let w = bmp.width, h = bmp.height;
+    const scale = Math.min(1, IMG_MAX_EDGE / Math.max(w, h));
+    w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d").drawImage(bmp, 0, 0, w, h);
+    if (bmp.close) bmp.close();
+    const data = c.toDataURL("image/jpeg", IMG_QUALITY).split(",")[1];
+    const name = f.name.replace(/\.(png|webp|heic|heif|jpe?g|gif)$/i, "") + ".jpg";
+    return { name, type: "image/jpeg", data };
+  } catch (err) {
+    return { name: f.name, type: f.type, data: await readBase64(f) };
+  }
+}
+$("files").addEventListener("change", async (e) => {
+  for (const f of e.target.files){
+    if (attached.length >= MAXF){ alert("Max " + MAXF + " files per review."); break; }
+    if (f.size > MAX_ORIGINAL_MB * 1024 * 1024){ alert(f.name + " is unusually large (over " + MAX_ORIGINAL_MB + "MB) — please pick a smaller file."); continue; }
+    try { attached.push(await fileToAttachment(f)); }
+    catch { alert("Couldn't read " + f.name + "."); }
+  }
+  e.target.value = "";
+  renderFiles();
+});
+function fmtSize(b){ const kb = Math.max(1, Math.round(b/1024)); return kb >= 1024 ? (kb/1024).toFixed(1) + " MB" : kb + " KB"; }
+function renderFiles(){
+  $("filelist").innerHTML = attached.map((f, i) => `<button type="button" class="copy" data-i="${i}" title="Click to remove">📄 ${esc(f.name)} · ${fmtSize(f.data.length * 3 / 4)} ✕</button>`).join("");
+  [...$("filelist").querySelectorAll("button")].forEach(b => b.addEventListener("click", () => { attached.splice(Number(b.dataset.i), 1); renderFiles(); }));
+}
+
+const FIELD_IDS = ["f-claimtype","f-ro","f-line","f-vin","f-mileage","f-mileageout","f-causalpart","f-origro","f-spwinstall","f-spwapproval","f-complaint","f-cause","f-correction","f-detail"];
+const REQUIRED = [["claimtype","Claim Type"],["ro","Repair Order #"],["line","Line #"],["vin","VIN"],["mileage","Mileage In"],["mileageout","Mileage Out"],["causalpart","Causal Part #"],["complaint","Complaint"],["cause","Cause"],["correction","Correction"]];
+// clear the red "required" mark as soon as the user starts typing / picks a value
+REQUIRED.forEach(([k]) => { const el = $("f-" + k); if (!el) return; el.addEventListener("input", () => el.closest(".field").classList.remove("bad")); el.addEventListener("change", () => el.closest(".field").classList.remove("bad")); });
+
+// Show which rulebook applies as soon as a claim type is picked.
+const CT_HINT = {
+  "11": "Reviewed against the New Vehicle Warranty (W&P) + OWS claiming rules.",
+  "11-ESP": "Reviewed against Ford/Lincoln Protect ESP rules — deductible, plan coverage, and prior-approval caveats apply on top of the base rules.",
+  "21": "Reviewed against Service Part Warranty rules — SPW coverage period, original-RO reference, and part-specific prior approval.",
+  "31": "Reviewed as a Field Service Action — must be claimed as the FSA (not warranty), open on OASIS, correct campaign/option code.",
+};
+$("f-claimtype").addEventListener("change", () => {
+  $("ct-hint").textContent = CT_HINT[$("f-claimtype").value] || "";
+  $("spw-fields").style.display = ($("f-claimtype").value === "21") ? "grid" : "none";
+});
+
+$("go").addEventListener("click", async () => {
+  const err = $("err"); err.style.display = "none";
+  document.querySelectorAll(".field.bad").forEach(f => f.classList.remove("bad"));
+  const fields = {
+    claimtype: $("f-claimtype").value.trim(),
+    ro: $("f-ro").value.trim(),
+    line: $("f-line").value.trim(),
+    vin: $("f-vin").value.trim().toUpperCase(),
+    mileage: $("f-mileage").value.trim(),
+    mileageout: $("f-mileageout").value.trim(),
+    causalpart: $("f-causalpart").value.trim().toUpperCase(),
+    origro: $("f-origro").value.trim(),
+    spwinstall: $("f-spwinstall").value.trim(),
+    spwapproval: $("f-spwapproval").value.trim(),
+    complaint: $("f-complaint").value.trim(),
+    cause: $("f-cause").value.trim(),
+    correction: $("f-correction").value.trim(),
+    detail: $("f-detail").value.trim(),
+  };
+  const missing = REQUIRED.filter(([k]) => !fields[k]);
+  if (missing.length){
+    missing.forEach(([k]) => { const el = $("f-" + k); if (el) el.closest(".field").classList.add("bad"); });
+    err.textContent = "Please fill in all required fields before reviewing: " + missing.map(([, l]) => l).join(", ") + ".";
+    err.style.display = "block";
+    err.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  const btn = $("go"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Reviewing…';
+  try{
+    const r = await fetch("/api/review", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({ ...fields, files: attached }) });
+    if (r.status === 401){ location.href = "/"; return; }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Review failed");
+    show(data.review); showRecalls(data.recallInfo);
+  }catch(e){ err.textContent = "Review failed: " + e.message; err.style.display = "block"; }
+  finally{ btn.disabled = false; btn.textContent = "Review ticket"; }
+});
+$("clear").addEventListener("click", () => {
+  FIELD_IDS.forEach(id => { const el = $(id); if (el) el.value = ""; });
+  $("ct-hint").textContent = "";
+  document.querySelectorAll(".field.bad").forEach(f => f.classList.remove("bad"));
+  attached = []; renderFiles(); $("results").style.display = "none"; $("err").style.display = "none";
+});
+
+function show(rv){
+  $("r-score").innerHTML = esc(rv.score) + "<small>/100</small>";
+  const v = String(rv.verdict || "needs_work");
+  const vp = $("r-verdict"); vp.className = "vpill v-" + v; vp.textContent = VLABEL[v] || v;
+  $("r-summary").textContent = rv.summary || "";
+
+  // score breakdown
+  const bd = rv.scoreBreakdown || [];
+  if (!bd.length){
+    $("bd-body").innerHTML = '<div class="bd-perfect">✓ 100 / 100 — no documentation gaps or risks found. This ticket is clean.</div>';
+  } else {
+    let lost = 0;
+    const rows = bd.map(d => { lost += Math.abs(d.points);
+      return `<div class="bd-row"><div class="pts ${esc(d.severity)}">${d.points}</div>
+        <div><div class="bd-label">${esc(d.label)}</div>${d.fix ? '<div class="bd-fix">Fix: ' + esc(d.fix) + "</div>" : ""}</div></div>`;
+    }).join("");
+    $("bd-body").innerHTML = rows +
+      `<div class="bd-total"><span>Starting 100 − ${lost} in deductions</span><span class="big">${rv.score}/100</span></div>`;
+  }
+
+  $("r-check").innerHTML = (rv.completeness || []).map(c => {
+    const st = String(c.status || "unclear");
+    return `<li><span class="st ${st}">${SLABEL[st] || esc(st)}</span><span><span class="ci">${esc(c.item)}</span> — <span class="cn">${esc(c.note)}</span></span></li>`;
+  }).join("");
+
+  const risks = rv.risks || [];
+  $("riskcard").style.display = risks.length ? "" : "none";
+  $("r-risks").innerHTML = risks.map(r => { const sv = String(r.severity || "warning");
+    return `<div class="risk"><span class="sev ${sv}">${SEVLBL[sv] || esc(sv)}</span><span><span class="rf">${esc(r.flag)}</span><div class="rd">${esc(r.detail)}</div></span></div>`;
+  }).join("");
+
+  $("rw-complaint").textContent = rv.rewrite?.complaint || "";
+  $("rw-cause").textContent = rv.rewrite?.cause || "";
+  $("rw-correction").textContent = rv.rewrite?.correction || "";
+
+  const qs = rv.questions || [];
+  $("qcard").style.display = qs.length ? "" : "none";
+  $("r-questions").innerHTML = qs.map(q => "<li>" + esc(q) + "</li>").join("");
+
+  $("results").style.display = "block";
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function showRecalls(info){
+  const card = $("recallcard");
+  if (!info){ card.style.display = "none"; return; }
+  card.style.display = "block";
+  if (info.error){ $("recall-veh").textContent = "VIN " + (info.vin || "") + " — lookup unavailable: " + info.error; $("r-recalls").innerHTML = ""; return; }
+  $("recall-veh").textContent = "VIN " + info.vin + " → " + info.year + " " + info.make + " " + info.model;
+  const list = info.recalls || [];
+  if (!list.length){ $("r-recalls").innerHTML = '<div class="cn">No recall campaigns on file at NHTSA for this year/make/model.</div>'; return; }
+  $("r-recalls").innerHTML = list.map(r => `<div class="risk"><span class="sev warning">${esc(r.campaign)}</span><span><span class="rf">${esc(r.component)}</span><div class="rd">${esc(r.summary)}${r.remedy ? "<br><em>Remedy:</em> " + esc(r.remedy) : ""}</div></span></div>`).join("");
+}
+
+document.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
+  const txt = $("rw-" + b.dataset.t).textContent;
+  try{ await navigator.clipboard.writeText(txt); b.textContent = "Copied!"; } catch{ b.textContent = "Select & copy"; }
+  setTimeout(() => b.textContent = "Copy", 1500);
+}));
+
+// Re-run: when arriving from History with ?rerun=<id>, load that ticket's saved
+// fields back into the form and highlight anything still missing.
+(async function initRerun(){
+  const id = new URLSearchParams(location.search).get("rerun");
+  if (!id) return;
+  try {
+    const r = await fetch("/api/history/" + encodeURIComponent(id));
+    if (!r.ok) return;
+    const { fields, record } = await r.json();
+    if (!fields) return;
+    const set = (fid, v) => { const el = $(fid); if (el && v != null) el.value = v; };
+    set("f-claimtype", fields.claimtype); $("f-claimtype").dispatchEvent(new Event("change"));
+    set("f-ro", fields.ro); set("f-line", fields.line); set("f-vin", fields.vin);
+    set("f-mileage", fields.mileage); set("f-mileageout", fields.mileageout); set("f-causalpart", fields.causalpart);
+    set("f-origro", fields.origro); set("f-spwinstall", fields.spwinstall); set("f-spwapproval", fields.spwapproval);
+    set("f-complaint", fields.complaint); set("f-cause", fields.cause); set("f-correction", fields.correction);
+    set("f-detail", fields.detail);
+    // Carry the original attachments forward so a re-review keeps the full record.
+    let carried = 0;
+    const rf = (record && record.files) || [];
+    if (rf.length){
+      try {
+        for (const meta of rf.slice(0, MAXF)){
+          const fr = await fetch("/api/history/" + encodeURIComponent(id) + "/file/" + encodeURIComponent(meta.key));
+          if (!fr.ok) continue;
+          const blob = await fr.blob();
+          const data = await new Promise((res2) => { const rd = new FileReader(); rd.onload = () => res2(String(rd.result).split(",")[1] || ""); rd.onerror = () => res2(""); rd.readAsDataURL(blob); });
+          if (data){ attached.push({ name: meta.name, type: meta.type, data }); carried++; }
+        }
+        renderFiles();
+      } catch {}
+    }
+    let missing = 0;
+    REQUIRED.forEach(([k]) => { const el = $("f-" + k); if (el && !el.value.trim()){ el.closest(".field").classList.add("bad"); missing++; } });
+    const rn = $("rerun-note");
+    rn.textContent = "Loaded from RO# " + (fields.ro || "?") + " — " + (missing
+      ? "fill in the " + missing + " highlighted field" + (missing > 1 ? "s" : "") + " that " + (missing > 1 ? "were" : "was") + " missing, then Review again."
+      : "everything carried over — adjust anything you like, then Review again.")
+      + (carried ? " " + carried + " attachment" + (carried > 1 ? "s" : "") + " carried over." : "");
+    rn.style.display = "block";
+    history.replaceState(null, "", location.pathname);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch {}
+})();
+</script>
+<script>
+(function(){
+  function apply(d){
+    if(!d||!d.store)return; var st=d.store;
+    var b=document.querySelector("#wordmark b"), s=document.querySelector("#wordmark small");
+    if(b)b.textContent=(st.name||"").toUpperCase(); if(s)s.textContent=(st.city||"").toUpperCase();
+    try{ if(document.title) document.title=document.title.replace(/Whiteface Ford/gi, st.name); }catch(e){}
+    var logo=document.getElementById("logo"), wm=document.getElementById("wordmark");
+    if(logo){
+      logo.onload=function(){logo.style.display="block"; if(wm)wm.style.display="none";};
+      logo.onerror=function(){logo.style.display="none"; if(wm)wm.style.display="flex";};
+      logo.alt=st.name||""; logo.src=st.logoUrl;
+    } else if(wm){ wm.style.display="flex"; }
+  }
+  fetch("/api/me").then(function(r){return r.ok?r.json():null;}).then(apply).catch(function(){});
+})();
+</script>
+</body>
+</html>
