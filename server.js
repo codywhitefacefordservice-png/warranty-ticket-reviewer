@@ -181,6 +181,7 @@ Review the ticket text the user provides and respond with ONLY a JSON object (no
 
 Rules:
 - Judge only from what is written. Never invent test results, part numbers, times, or diagnostic steps that are not in the ticket - if the rewrite needs a fact that is missing, put a bracketed placeholder like [ADD PUNCH TIME] and list it in "questions".
+- The repair order supplies these as SEPARATE DOCUMENTED FIELDS, listed at the top of the ticket: Repair Order #, Line, VIN, Mileage In, Mileage Out, and Causal Part #. When a value is present in one of these fields, that element is DOCUMENTED - mark its completeness item "ok" and do NOT deduct or flag it just because it is not repeated in the Complaint/Cause/Correction narrative. Per Ford, these must be documented on the RO, not written into the 3C story. Only flag such an item if its field is actually blank, or internally inconsistent (e.g. Mileage Out lower than Mileage In, or a Causal Part # that plainly contradicts the stated cause). A Causal Part # of "NPF" means no-problem-found - evaluate it under the NPF rules, not as a missing causal part.
 - "Found bad, replaced"-style causes, missing diagnosis, wear/maintenance items claimed as warranty, aftermarket-part involvement, time far over the labor op, and story inconsistencies are the classic rejection triggers - call them out.
 - Be direct and practical, like a warranty admin who wants the claim to get PAID, not a lecture.
 - Never question or flag the calendar dates on the ticket as implausible or "in the future" - assume the ticket's dates are current. Only flag dates for internal inconsistency (e.g. date out before date in, disclosure before repair).
@@ -336,7 +337,7 @@ function saveHistory() {
 // guaranteed. Bump RUBRIC_VERSION whenever the scoring logic, weights, or
 // system prompt change so previously cached results are invalidated.
 // ---------------------------------------------------------------------------
-const RUBRIC_VERSION = "2026-07-16.5";
+const RUBRIC_VERSION = "2026-07-16.6";
 const REVIEW_CACHE_FILE = path.join(HISTORY_DIR, "review_cache.json");
 const REVIEW_CACHE_CAP = 3000;
 let REVIEW_CACHE = {};
@@ -942,7 +943,9 @@ function assembleTicket(f) {
   const parts = [
     "CLAIM TYPE: " + ctLabel,
     "REPAIR ORDER #: " + f.ro + "    LINE: " + f.line,
-    "VIN: " + f.vin + "    MILEAGE: " + f.mileage,
+    "VIN: " + f.vin,
+    "MILEAGE IN: " + f.mileage + "    MILEAGE OUT: " + f.mileageout,
+    "CAUSAL PART #: " + f.causalpart,
     "",
     "COMPLAINT: " + f.complaint,
     "CAUSE: " + f.cause,
@@ -960,6 +963,8 @@ app.post("/api/review", async (req, res) => {
     line: String(b.line || "").trim(),
     vin: String(b.vin || "").trim().toUpperCase(),
     mileage: String(b.mileage || "").trim(),
+    mileageout: String(b.mileageout || "").trim(),
+    causalpart: String(b.causalpart || "").trim().toUpperCase(),
     complaint: String(b.complaint || "").trim(),
     cause: String(b.cause || "").trim(),
     correction: String(b.correction || "").trim(),
@@ -969,7 +974,7 @@ app.post("/api/review", async (req, res) => {
 
   let ticket, vinField;
   const legacy = String(b.ticket || "").trim();
-  const usingFields = f.claimType || f.ro || f.line || f.vin || f.mileage || f.complaint || f.cause || f.correction;
+  const usingFields = f.claimType || f.ro || f.line || f.vin || f.mileage || f.mileageout || f.causalpart || f.complaint || f.cause || f.correction;
   if (usingFields || !legacy) {
     // Structured mode: every listed field is required before a review runs.
     const missing = [];
@@ -977,7 +982,9 @@ app.post("/api/review", async (req, res) => {
     if (!f.ro) missing.push("Repair Order #");
     if (!f.line) missing.push("Line #");
     if (!f.vin) missing.push("VIN");
-    if (!f.mileage) missing.push("Mileage");
+    if (!f.mileage) missing.push("Mileage In");
+    if (!f.mileageout) missing.push("Mileage Out");
+    if (!f.causalpart) missing.push("Causal Part #");
     if (!f.complaint) missing.push("Complaint");
     if (!f.cause) missing.push("Cause");
     if (!f.correction) missing.push("Correction");
@@ -1016,6 +1023,8 @@ app.post("/api/review", async (req, res) => {
       ro: f.ro || extractRo(ticket),
       line: f.line || "",
       mileage: f.mileage || "",
+      mileageOut: f.mileageout || "",
+      causalPart: f.causalpart || "",
       vin: vin || "",
       vehicle: recallInfo && !recallInfo.error ? (recallInfo.year + " " + recallInfo.make + " " + recallInfo.model) : "",
       score: review?.score ?? null,
