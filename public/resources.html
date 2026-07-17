@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Resources — Whiteface Ford</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px;color:var(--ink)}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  a{color:var(--brand-2)}
+  .topic{font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--brand);margin:22px 0 10px}
+  @media (prefers-color-scheme: dark){ .topic{color:var(--brand-2)} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 2px rgba(16,23,38,.04);display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+  .doc-ico{flex:0 0 40px;width:40px;height:48px;border-radius:6px;background:linear-gradient(160deg,#c8102e,#8a0b20);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:flex-end;justify-content:center;padding-bottom:5px;letter-spacing:.05em;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .doc-main{flex:1;min-width:220px}
+  .doc-title{font-weight:800;font-size:16px}
+  .doc-desc{color:var(--ink-2);font-size:13.5px;margin-top:3px}
+  .doc-meta{color:var(--muted);font-size:12px;margin-top:6px}
+  .doc-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button,a.btn{padding:9px 16px;font-size:13.5px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-block;box-shadow:0 1px 2px rgba(16,23,38,.06);transition:border-color .12s ease,box-shadow .12s ease,transform .05s ease,filter .12s ease}
+  a.btn:hover{border-color:var(--brand-2);box-shadow:0 2px 6px rgba(16,23,38,.12)}
+  a.btn:active{transform:translateY(1px)}
+  a.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(0,52,120,.30),inset 0 1px 0 rgba(255,255,255,.15)}
+  a.btn.primary:hover{filter:brightness(1.08);box-shadow:0 5px 12px rgba(0,52,120,.34)}
+  a.btn.disabled{opacity:.5;pointer-events:none}
+  .unavail{color:var(--muted);font-size:12.5px;font-style:italic}
+  .empty{color:var(--muted);padding:30px 0;text-align:center}
+  footer{margin-top:22px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" alt="" style="display:none">
+    <span id="wordmark" class="wordmark"><b></b><small></small></span>
+  </a>
+  <nav class="nav">
+    <a href="/">Reviewer</a>
+    <a href="/appeal">Appeals</a>
+    <a href="/history">History</a>
+    <a href="/resources" class="active">Resources</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">Resources</div>
+  <div class="page-sub">The Ford reference manuals behind this tool — open or download the full PDFs when you need to look something up. For internal dealership use only.</div>
+
+  <div id="list"><div class="empty">Loading…</div></div>
+
+  <footer>These manuals are Ford's copyrighted material, provided here for Whiteface Ford internal use behind the access code. Do not redistribute.</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function mb(bytes){ return bytes ? (bytes/1048576).toFixed(1) + " MB PDF" : "PDF"; }
+async function load(){
+  const r = await fetch("/api/resources");
+  if (r.status === 401){ location.href = "/"; return; }
+  const data = await r.json();
+  const items = data.resources || [];
+  // group by topic, preserving first-seen order
+  const order = [], groups = {};
+  for (const it of items){ if (!groups[it.topic]){ groups[it.topic] = []; order.push(it.topic); } groups[it.topic].push(it); }
+  if (!items.length){ $("list").innerHTML = '<div class="empty">No resources yet.</div>'; return; }
+  $("list").innerHTML = order.map(topic => {
+    const cards = groups[topic].map(it => {
+      const actions = it.available
+        ? '<a class="btn primary" href="/resources/file/' + esc(it.key) + '" target="_blank" rel="noopener">Open</a>' +
+          '<a class="btn" href="/resources/file/' + esc(it.key) + '?dl=1">Download</a>'
+        : '<span class="unavail">Not uploaded yet</span>';
+      return '<div class="card"><div class="doc-ico">PDF</div><div class="doc-main">' +
+        '<div class="doc-title">' + esc(it.title) + '</div>' +
+        '<div class="doc-desc">' + esc(it.desc) + '</div>' +
+        '<div class="doc-meta">' + esc(mb(it.bytes)) + '</div></div>' +
+        '<div class="doc-actions">' + actions + '</div></div>';
+    }).join("");
+    return '<div class="topic">' + esc(topic) + '</div>' + cards;
+  }).join("");
+}
+load();
+</script>
+<script>
+(function(){
+  function apply(d){
+    if(!d||!d.store)return; var st=d.store;
+    var b=document.querySelector("#wordmark b"), s=document.querySelector("#wordmark small");
+    if(b)b.textContent=(st.name||"").toUpperCase(); if(s)s.textContent=(st.city||"").toUpperCase();
+    try{ if(document.title) document.title=document.title.replace(/Whiteface Ford/gi, st.name); }catch(e){}
+    var logo=document.getElementById("logo"), wm=document.getElementById("wordmark");
+    if(logo){
+      logo.onload=function(){logo.style.display="block"; if(wm)wm.style.display="none";};
+      logo.onerror=function(){logo.style.display="none"; if(wm)wm.style.display="flex";};
+      logo.alt=st.name||""; logo.src=st.logoUrl;
+    } else if(wm){ wm.style.display="flex"; }
+  }
+  fetch("/api/me").then(function(r){return r.ok?r.json():null;}).then(apply).catch(function(){});
+})();
+</script>
+</body>
+</html>
