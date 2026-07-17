@@ -41,7 +41,7 @@
            border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);resize:vertical}
   textarea:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
   /* structured input form */
-  .fgrid{display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:12px;margin-bottom:14px}
+  .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
   @media (max-width:640px){ .fgrid{grid-template-columns:1fr 1fr} }
   .field{margin-bottom:14px}
   .field:last-child{margin-bottom:0}
@@ -149,7 +149,9 @@
       <div class="field"><label for="f-ro">Repair Order # <span class="req">*</span></label><input id="f-ro" autocomplete="off" placeholder="e.g. 771902"></div>
       <div class="field"><label for="f-line">Line # <span class="req">*</span></label><input id="f-line" autocomplete="off" placeholder="e.g. A"></div>
       <div class="field"><label for="f-vin">VIN <span class="req">*</span></label><input id="f-vin" autocomplete="off" maxlength="17" placeholder="17-character VIN" style="text-transform:uppercase"></div>
-      <div class="field"><label for="f-mileage">Mileage <span class="req">*</span></label><input id="f-mileage" autocomplete="off" inputmode="numeric" placeholder="e.g. 41250"></div>
+      <div class="field"><label for="f-mileage">Mileage In <span class="req">*</span></label><input id="f-mileage" autocomplete="off" inputmode="numeric" placeholder="odometer at write-up"></div>
+      <div class="field"><label for="f-mileageout">Mileage Out <span class="req">*</span></label><input id="f-mileageout" autocomplete="off" inputmode="numeric" placeholder="odometer at completion"></div>
+      <div class="field"><label for="f-causalpart">Causal Part # <span class="req">*</span></label><input id="f-causalpart" autocomplete="off" placeholder="part number (or NPF)" style="text-transform:uppercase"></div>
     </div>
     <div class="field"><label for="f-complaint">Complaint — customer concern <span class="req">*</span></label><textarea id="f-complaint" class="c3" placeholder="What the customer reported."></textarea></div>
     <div class="field"><label for="f-cause">Cause <span class="req">*</span></label><textarea id="f-cause" class="c3" placeholder="What was found to be causing it — the causal part / condition."></textarea></div>
@@ -241,8 +243,8 @@ function renderFiles(){
   [...$("filelist").querySelectorAll("button")].forEach(b => b.addEventListener("click", () => { attached.splice(Number(b.dataset.i), 1); renderFiles(); }));
 }
 
-const FIELD_IDS = ["f-claimtype","f-ro","f-line","f-vin","f-mileage","f-complaint","f-cause","f-correction","f-detail"];
-const REQUIRED = [["claimtype","Claim Type"],["ro","Repair Order #"],["line","Line #"],["vin","VIN"],["mileage","Mileage"],["complaint","Complaint"],["cause","Cause"],["correction","Correction"]];
+const FIELD_IDS = ["f-claimtype","f-ro","f-line","f-vin","f-mileage","f-mileageout","f-causalpart","f-complaint","f-cause","f-correction","f-detail"];
+const REQUIRED = [["claimtype","Claim Type"],["ro","Repair Order #"],["line","Line #"],["vin","VIN"],["mileage","Mileage In"],["mileageout","Mileage Out"],["causalpart","Causal Part #"],["complaint","Complaint"],["cause","Cause"],["correction","Correction"]];
 // clear the red "required" mark as soon as the user starts typing / picks a value
 REQUIRED.forEach(([k]) => { const el = $("f-" + k); if (!el) return; el.addEventListener("input", () => el.closest(".field").classList.remove("bad")); el.addEventListener("change", () => el.closest(".field").classList.remove("bad")); });
 
@@ -264,6 +266,8 @@ $("go").addEventListener("click", async () => {
     line: $("f-line").value.trim(),
     vin: $("f-vin").value.trim().toUpperCase(),
     mileage: $("f-mileage").value.trim(),
+    mileageout: $("f-mileageout").value.trim(),
+    causalpart: $("f-causalpart").value.trim().toUpperCase(),
     complaint: $("f-complaint").value.trim(),
     cause: $("f-cause").value.trim(),
     correction: $("f-correction").value.trim(),
