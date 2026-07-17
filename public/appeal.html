@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Appeal Drafter — Whiteface Ford</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8;
+    --good:#0a8a3a; --good-ink:#0a7a34; --warning:#b7791f; --serious:#c05621; --critical:#c8102e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442;
+      --good:#38c172; --good-ink:#38c172; --warning:#e0b64a; --serious:#ef9a6a; --critical:#ef5a6f; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px;color:var(--ink)}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  h2{font-size:14px;margin:0 0 12px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--brand)}
+  @media (prefers-color-scheme: dark){ h2{color:var(--brand-2)} }
+  a{color:var(--brand-2)}
+  label.fl{display:block;font-weight:700;font-size:13px;margin:14px 0 6px;color:var(--ink)}
+  textarea{width:100%;min-height:140px;padding:14px;font:13.5px/1.5 ui-monospace,Consolas,monospace;
+           border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);resize:vertical}
+  textarea:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  .bar{display:flex;gap:10px;align-items:center;margin:16px 0 24px;flex-wrap:wrap}
+  button{padding:11px 20px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(16,23,38,.06);transition:border-color .12s ease,box-shadow .12s ease,transform .05s ease,filter .12s ease}
+  button:hover{border-color:var(--brand-2);box-shadow:0 2px 6px rgba(16,23,38,.12)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(0,52,120,.30),inset 0 1px 0 rgba(255,255,255,.15)}
+  button.primary:hover{filter:brightness(1.08);box-shadow:0 5px 12px rgba(0,52,120,.34),inset 0 1px 0 rgba(255,255,255,.15)}
+  button:disabled{opacity:.55;cursor:wait;box-shadow:none;transform:none}
+  .hint{color:var(--muted);font-size:12.5px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,23,38,.04)}
+  #results{display:none}
+  .vpill{display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:6px;font-weight:800;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+  .s-strong{color:var(--good-ink);background:rgba(10,138,58,.12)}
+  .s-moderate{color:#8a5a00;background:rgba(183,121,31,.16)}
+  .s-weak{color:var(--critical);background:rgba(200,16,46,.12)}
+  @media (prefers-color-scheme: dark){ .s-moderate{color:var(--warning)} .s-weak{color:#ef5a6f} }
+  .kv{margin:8px 0 0;color:var(--ink-2)} .kv b{color:var(--ink)}
+  .arg{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--grid)} .arg:last-child{border-bottom:0}
+  .cite{flex:0 0 110px;font-weight:800;font-size:12px;color:var(--brand-2);white-space:nowrap}
+  ul.ev{margin:0;padding-left:20px;color:var(--ink-2)} ul.ev li{margin:4px 0}
+  .letter{background:var(--page);border:1px solid var(--grid);border-radius:8px;padding:14px 16px;margin-top:6px;font-size:14px;white-space:pre-wrap}
+  .copy{font-size:12px;padding:3px 11px;font-weight:700}
+  .error{display:none;color:var(--critical);background:rgba(200,16,46,.08);border:1px solid rgba(200,16,46,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px}
+  footer{margin-top:22px;color:var(--muted);font-size:12px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" alt="" style="display:none">
+    <span id="wordmark" class="wordmark"><b></b><small></small></span>
+  </a>
+  <nav class="nav">
+    <a href="/">Reviewer</a>
+    <a href="/appeal" class="active">Appeals</a>
+    <a href="/history">History</a>
+    <a href="/resources">Resources</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">Appeal Drafter</div>
+  <div class="page-sub">Paste the rejection or chargeback plus the original claim for an honest assessment and a ready-to-file appeal.</div>
+
+  <label class="fl" for="rejection">Rejection / chargeback notice from Ford</label>
+  <textarea id="rejection" placeholder="Paste the OWS return message, denial reason, or chargeback notice (P61–P67) here."></textarea>
+
+  <label class="fl" for="ticket">Original repair order / claim</label>
+  <textarea id="ticket" placeholder="Paste the RO or claim as submitted — the 3 Cs, parts, labor ops, times, VIN, mileage."></textarea>
+
+  <input type="file" id="files" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple style="display:none">
+  <div class="bar">
+    <button id="go" class="primary">Draft appeal</button>
+    <button id="attach">Attach paperwork</button>
+    <button id="clear">Clear</button>
+    <span class="hint">Photos or PDFs of the RO, rejection, or supporting printouts. Appeals are saved to History.</span>
+  </div>
+  <div id="filelist" class="bar" style="margin-top:-14px"></div>
+
+  <div id="err" class="error"></div>
+
+  <div id="results">
+    <div class="card">
+      <h2>Assessment</h2>
+      <span class="vpill" id="a-strength"></span>
+      <div class="kv"><b>Code / reason:</b> <span id="a-code"></span> — <span id="a-reason"></span></div>
+      <div class="kv"><b>Recommendation:</b> <span id="a-rec"></span></div>
+      <div class="kv"><b>Deadline:</b> <span id="a-deadline"></span></div>
+    </div>
+    <div class="card"><h2>Arguments</h2><div id="a-args"></div></div>
+    <div class="card" id="evcard"><h2>Attach / have ready</h2><ul class="ev" id="a-evidence"></ul></div>
+    <div class="card">
+      <h2 style="display:flex;justify-content:space-between;align-items:center"><span>Appeal letter</span><button class="copy" id="copyletter">Copy</button></h2>
+      <div class="letter" id="a-letter"></div>
+      <div class="hint" style="margin-top:8px">Bracketed items like [ATTACH ALIGNMENT PRINTOUT] need your real documents — the AI never invents facts.</div>
+    </div>
+  </div>
+
+  <footer>AI-assisted drafting — a second set of eyes, not official Ford guidance. Please consult your service manager and warranty administrator for further guidance.</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+let attached = [];
+const MAXF = 4, MAXMB = 10;
+$("attach").addEventListener("click", () => $("files").click());
+$("files").addEventListener("change", async (e) => {
+  for (const f of e.target.files){
+    if (attached.length >= MAXF){ alert("Max " + MAXF + " files."); break; }
+    if (f.size > MAXMB * 1024 * 1024){ alert(f.name + " is over " + MAXMB + "MB."); continue; }
+    const data = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result).split(",")[1]); rd.onerror = rej; rd.readAsDataURL(f); });
+    attached.push({ name: f.name, type: f.type, data });
+  }
+  e.target.value = ""; renderFiles();
+});
+function renderFiles(){
+  $("filelist").innerHTML = attached.map((f, i) => `<button type="button" class="copy" data-i="${i}" title="Click to remove">📄 ${esc(f.name)} ✕</button>`).join("");
+  [...$("filelist").querySelectorAll("button")].forEach(b => b.addEventListener("click", () => { attached.splice(Number(b.dataset.i), 1); renderFiles(); }));
+}
+$("go").addEventListener("click", async () => {
+  const rejection = $("rejection").value.trim(); const ticket = $("ticket").value.trim();
+  const err = $("err"); err.style.display = "none";
+  if (!rejection){ err.textContent = "Paste the rejection or chargeback notice first."; err.style.display = "block"; return; }
+  const btn = $("go"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Drafting…';
+  try{
+    const r = await fetch("/api/appeal", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({ rejection, ticket, files: attached }) });
+    if (r.status === 401){ location.href = "/"; return; }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Drafting failed");
+    show(data.appeal);
+  }catch(e){ err.textContent = "Drafting failed: " + e.message; err.style.display = "block"; }
+  finally{ btn.disabled = false; btn.textContent = "Draft appeal"; }
+});
+$("clear").addEventListener("click", () => { $("rejection").value = ""; $("ticket").value = ""; attached = []; renderFiles(); $("results").style.display = "none"; $("err").style.display = "none"; });
+function show(a){
+  const an = a.analysis || {};
+  const s = String(an.strength || "moderate");
+  const pill = $("a-strength"); pill.className = "vpill s-" + s;
+  pill.textContent = s === "strong" ? "Strong appeal" : s === "weak" ? "Weak appeal — read the recommendation" : "Moderate appeal";
+  $("a-code").textContent = an.code || "—";
+  $("a-reason").textContent = an.reason || "";
+  $("a-rec").textContent = an.recommendation || "";
+  $("a-deadline").textContent = an.deadline || "";
+  $("a-args").innerHTML = (a.arguments || []).map(x => `<div class="arg"><span class="cite">${esc(x.citation)}</span><span>${esc(x.point)}</span></div>`).join("");
+  const ev = a.evidence || [];
+  $("evcard").style.display = ev.length ? "" : "none";
+  $("a-evidence").innerHTML = ev.map(e => "<li>" + esc(e) + "</li>").join("");
+  $("a-letter").textContent = a.letter || "";
+  $("results").style.display = "block";
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("copyletter").addEventListener("click", async () => {
+  try{ await navigator.clipboard.writeText($("a-letter").textContent); $("copyletter").textContent = "Copied!"; } catch{ $("copyletter").textContent = "Select & copy"; }
+  setTimeout(() => $("copyletter").textContent = "Copy", 1500);
+});
+</script>
+<script>
+(function(){
+  function apply(d){
+    if(!d||!d.store)return; var st=d.store;
+    var b=document.querySelector("#wordmark b"), s=document.querySelector("#wordmark small");
+    if(b)b.textContent=(st.name||"").toUpperCase(); if(s)s.textContent=(st.city||"").toUpperCase();
+    try{ if(document.title) document.title=document.title.replace(/Whiteface Ford/gi, st.name); }catch(e){}
+    var logo=document.getElementById("logo"), wm=document.getElementById("wordmark");
+    if(logo){
+      logo.onload=function(){logo.style.display="block"; if(wm)wm.style.display="none";};
+      logo.onerror=function(){logo.style.display="none"; if(wm)wm.style.display="flex";};
+      logo.alt=st.name||""; logo.src=st.logoUrl;
+    } else if(wm){ wm.style.display="flex"; }
+    try{
+      var nav=document.querySelector(".nav");
+      if(nav && !nav.querySelector("[data-acct]")){
+        var so=nav.querySelector('a[href="/logout"]');
+        if(d.user && d.user.role==="owner"){ var con=document.createElement("a"); con.href="/console"; con.textContent="Console"; con.setAttribute("data-con","1"); if(so)nav.insertBefore(con,so); else nav.appendChild(con); }
+        var ac=document.createElement("a"); ac.href="/account"; ac.textContent="Account"; ac.setAttribute("data-acct","1"); if(so)nav.insertBefore(ac,so); else nav.appendChild(ac);
+      }
+    }catch(e){}
+  }
+  fetch("/api/me").then(function(r){return r.ok?r.json():null;}).then(apply).catch(function(){});
+})();
+</script>
+</body>
+</html>
