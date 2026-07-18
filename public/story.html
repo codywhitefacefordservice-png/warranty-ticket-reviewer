@@ -48,6 +48,13 @@
   button.primary:hover{filter:brightness(1.08)}
   button:disabled{opacity:.55;cursor:wait;box-shadow:none;transform:none}
   .hint{color:var(--muted);font-size:12.5px}
+  .opts{margin-top:16px;padding:14px 15px;background:var(--page);border:1px solid var(--grid);border-radius:8px}
+  .opts-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);margin-bottom:10px}
+  .opt-row{display:flex;gap:10px;align-items:flex-start;margin:8px 0;cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink);font-size:13.5px}
+  .opt-row input{width:16px;height:16px;margin-top:2px;flex:0 0 16px;accent-color:var(--brand)}
+  .opt-row b{font-weight:700}
+  .opt-desc{color:var(--muted);font-size:12.5px}
+  .opts-note{margin-top:10px;font-size:12px;color:var(--muted);border-top:1px solid var(--grid);padding-top:9px}
   #results{display:none}
   .story-field{margin-bottom:14px}
   .story-field:last-child{margin-bottom:0}
@@ -110,10 +117,18 @@
     <textarea id="found" placeholder="e.g. front pads worn to 2mm, rotors lightly scored"></textarea>
     <label for="done">What you did</label>
     <textarea id="done" placeholder="e.g. replaced front pads, resurfaced rotors, road tested"></textarea>
+
+    <div class="opts">
+      <div class="opts-title">How strong do you want it? <span class="opt">— all optional, your call</span></div>
+      <label class="opt-row"><input type="checkbox" id="opt-search"><span><b>Look up the test procedure &amp; spec online</b><br><span class="opt-desc">Searches the internet and lists the reference sources it used.</span></span></label>
+      <label class="opt-row"><input type="checkbox" id="opt-readings"><span><b>Suggest typical failure readings for me to confirm</b><br><span class="opt-desc">Fills in professional-sounding test values you must replace with your real measurements before submitting.</span></span></label>
+      <div class="opts-note">Leave both off for a clean write-up of only what you entered — nothing added, nothing to verify. Turn them on to build a stronger, testing-based story. Any suggested numbers are yours to confirm.</div>
+    </div>
+
     <div class="bar">
       <button id="go" class="primary">Write the story</button>
       <button id="clear">Clear</button>
-      <span class="hint">Rough notes are fine — it cleans them up. Nothing is invented that you didn't write.</span>
+      <span class="hint">Rough notes are fine — it cleans them up. With the options above off, only what you wrote is used.</span>
     </div>
   </div>
 
@@ -155,7 +170,7 @@ const $=(id)=>document.getElementById(id);
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 async function copyText(t, btn){ try{ await navigator.clipboard.writeText(t); const o=btn.textContent; btn.textContent="Copied ✓"; setTimeout(()=>btn.textContent=o,1200);}catch(e){} }
 $("go").addEventListener("click", async ()=>{
-  const body={ details:$("details").value.trim(), component:$("component").value.trim(), concern:$("concern").value.trim(), found:$("found").value.trim(), done:$("done").value.trim() };
+  const body={ details:$("details").value.trim(), component:$("component").value.trim(), concern:$("concern").value.trim(), found:$("found").value.trim(), done:$("done").value.trim(), search:$("opt-search").checked, readings:$("opt-readings").checked };
   const err=$("err"); err.style.display="none";
   if(!body.concern||!body.found||!body.done){ err.textContent="Fill in the concern, what you found, and what you did."; err.style.display="block"; return; }
   const btn=$("go"); btn.disabled=true; const orig=btn.textContent; btn.innerHTML='<span class="spin"></span>Writing…';
@@ -173,7 +188,7 @@ $("go").addEventListener("click", async ()=>{
   }catch(e){ err.textContent="Network error — try again."; err.style.display="block"; }
   finally{ btn.disabled=false; btn.textContent=orig; }
 });
-$("clear").addEventListener("click", ()=>{ ["details","component","concern","found","done"].forEach(id=>$(id).value=""); $("results").style.display="none"; $("err").style.display="none"; });
+$("clear").addEventListener("click", ()=>{ ["details","component","concern","found","done"].forEach(id=>$(id).value=""); $("opt-search").checked=false; $("opt-readings").checked=false; $("results").style.display="none"; $("err").style.display="none"; });
 document.addEventListener("click",(e)=>{
   const b=e.target.closest("[data-copy]"); if(b){ copyText($(b.dataset.copy).textContent, b); return; }
   if(e.target.id==="copyall"){ const t="COMPLAINT: "+$("o-complaint").textContent+"\n\nCAUSE: "+$("o-cause").textContent+"\n\nCORRECTION: "+$("o-correction").textContent; copyText(t, e.target); }
