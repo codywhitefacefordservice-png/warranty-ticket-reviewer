@@ -58,6 +58,17 @@
   .cust{background:rgba(10,75,179,.06);border-color:rgba(10,75,179,.25)}
   @media (prefers-color-scheme: dark){ .cust{background:rgba(91,141,239,.10)} }
   .tips{margin:6px 0 0;padding-left:20px;color:var(--ink-2);font-size:13.5px} .tips li{margin:4px 0}
+  .warncard{border-color:rgba(200,16,46,.45);background:rgba(200,16,46,.05)}
+  .warncard h2{color:var(--red)}
+  .warn-lead{font-size:13.5px;color:var(--ink);margin:0 0 12px;font-weight:600}
+  .rtable{width:100%;border-collapse:collapse;font-size:13.5px}
+  .rtable th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--border)}
+  .rtable td{padding:8px 10px;border-bottom:1px solid var(--grid);vertical-align:top}
+  .rtable tr:last-child td{border-bottom:none}
+  .rd-sugg{font-weight:800;color:var(--red);white-space:nowrap}
+  .rd-spec{color:var(--ink-2);white-space:nowrap}
+  .src{font-size:13px;margin:5px 0} .src a{color:var(--brand-2);word-break:break-word}
+  .srcnote{color:var(--muted);font-size:12px;margin:0 0 8px}
   .error{display:none;color:var(--red);background:rgba(200,16,46,.08);border:1px solid rgba(200,16,46,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px}
   .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -89,6 +100,10 @@
       <label for="details">Vehicle & details <span class="opt">(optional — year/make/model, mileage, parts used)</span></label>
       <input id="details" placeholder="e.g. 2021 F-150, 42,300 mi">
     </div>
+    <div class="story-field">
+      <label for="component">Failed component <span class="opt">(optional — helps look up the test procedure & spec, e.g. "alternator", "wheel bearing")</span></label>
+      <input id="component" placeholder="e.g. alternator">
+    </div>
     <label for="concern">Customer concern <span class="opt">(what they came in for)</span></label>
     <textarea id="concern" placeholder="e.g. customer says brakes squeal when stopping"></textarea>
     <label for="found">What you found</label>
@@ -112,9 +127,19 @@
       <div class="story-field"><div class="sf-head"><span class="sf-label">Correction</span><button class="copy" data-copy="o-correction">Copy</button></div><div class="sf-body" id="o-correction"></div></div>
       <div class="bar"><button class="copy" id="copyall">Copy all 3</button></div>
     </div>
+    <div class="card warncard" id="readcard" style="display:none">
+      <h2>⚠ Confirm these readings before you submit</h2>
+      <p class="warn-lead">These numbers are typical failure values inserted so the story reads professionally — they are <b>not</b> your actual measurements. Replace each one with the reading you took (they appear as <b>[CONFIRM: …]</b> in the story above). The specification is looked-up reference, not a measurement.</p>
+      <table class="rtable"><thead><tr><th>Measurement</th><th>Suggested (replace)</th><th>Spec</th></tr></thead><tbody id="o-readings"></tbody></table>
+    </div>
     <div class="card">
       <h2>For the customer</h2>
       <div class="story-field"><div class="sf-head"><span class="sf-label">Plain-English explanation</span><button class="copy" data-copy="o-customer">Copy</button></div><div class="sf-body cust" id="o-customer"></div></div>
+    </div>
+    <div class="card" id="srccard" style="display:none">
+      <h2>Reference sources</h2>
+      <p class="srcnote">Test procedure and specification looked up from these sources. Always confirm the spec against the manufacturer's service information for the specific vehicle.</p>
+      <div id="o-sources"></div>
     </div>
     <div class="card" id="tipcard" style="display:none">
       <h2>To make it even stronger</h2>
@@ -130,7 +155,7 @@ const $=(id)=>document.getElementById(id);
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 async function copyText(t, btn){ try{ await navigator.clipboard.writeText(t); const o=btn.textContent; btn.textContent="Copied ✓"; setTimeout(()=>btn.textContent=o,1200);}catch(e){} }
 $("go").addEventListener("click", async ()=>{
-  const body={ details:$("details").value.trim(), concern:$("concern").value.trim(), found:$("found").value.trim(), done:$("done").value.trim() };
+  const body={ details:$("details").value.trim(), component:$("component").value.trim(), concern:$("concern").value.trim(), found:$("found").value.trim(), done:$("done").value.trim() };
   const err=$("err"); err.style.display="none";
   if(!body.concern||!body.found||!body.done){ err.textContent="Fill in the concern, what you found, and what you did."; err.style.display="block"; return; }
   const btn=$("go"); btn.disabled=true; const orig=btn.textContent; btn.innerHTML='<span class="spin"></span>Writing…';
@@ -140,13 +165,15 @@ $("go").addEventListener("click", async ()=>{
     if(!r.ok){ err.textContent=d.error||"Something went wrong. Try again."; err.style.display="block"; return; }
     const s=d.story;
     $("o-complaint").textContent=s.complaint; $("o-cause").textContent=s.cause; $("o-correction").textContent=s.correction; $("o-customer").textContent=s.customer;
+    if(s.readings && s.readings.length){ $("o-readings").innerHTML=s.readings.map(r=>"<tr><td>"+esc(r.label)+"</td><td class='rd-sugg'>"+esc(r.suggested||"—")+"</td><td class='rd-spec'>"+esc(r.spec||"—")+"</td></tr>").join(""); $("readcard").style.display="block"; } else { $("readcard").style.display="none"; }
+    if(s.sources && s.sources.length){ $("o-sources").innerHTML=s.sources.map(x=>'<div class="src"><a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.title||x.url)+'</a></div>').join(""); $("srccard").style.display="block"; } else { $("srccard").style.display="none"; }
     if(s.tips && s.tips.length){ $("o-tips").innerHTML=s.tips.map(t=>"<li>"+esc(t)+"</li>").join(""); $("tipcard").style.display="block"; } else { $("tipcard").style.display="none"; }
     $("results").style.display="block";
     $("results").scrollIntoView({behavior:"smooth",block:"start"});
   }catch(e){ err.textContent="Network error — try again."; err.style.display="block"; }
   finally{ btn.disabled=false; btn.textContent=orig; }
 });
-$("clear").addEventListener("click", ()=>{ ["details","concern","found","done"].forEach(id=>$(id).value=""); $("results").style.display="none"; $("err").style.display="none"; });
+$("clear").addEventListener("click", ()=>{ ["details","component","concern","found","done"].forEach(id=>$(id).value=""); $("results").style.display="none"; $("err").style.display="none"; });
 document.addEventListener("click",(e)=>{
   const b=e.target.closest("[data-copy]"); if(b){ copyText($(b.dataset.copy).textContent, b); return; }
   if(e.target.id==="copyall"){ const t="COMPLAINT: "+$("o-complaint").textContent+"\n\nCAUSE: "+$("o-cause").textContent+"\n\nCORRECTION: "+$("o-correction").textContent; copyText(t, e.target); }
