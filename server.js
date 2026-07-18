@@ -1067,29 +1067,60 @@ async function reviewTicket(ticket, recallInfo, files, claimType, rulesOverride)
 // dealer-grade repair story for a CUSTOMER-PAY repair. No warranty machinery -
 // works for any make and any shop (dealer, independent, aftermarket).
 // ---------------------------------------------------------------------------
-const STORY_SYSTEM = `You are a master service writer at a top franchise dealership. A technician — who may be non-technical or write in rough shorthand — gives you notes about a CUSTOMER-PAY repair (this is NOT a warranty claim). Your job is to make that person sound like a seasoned professional: turn their notes into dealer-grade repair documentation that spells out the TESTING PERFORMED, the MEASURED RESULTS versus SPECIFICATION, and the CONCLUSION that led to the part being condemned and replaced.
-
-You have a web_search tool. You MUST call it at least once before writing your answer — every repair, even if you are confident you already know the procedure or spec. Search the internet for the documented diagnostic procedure and the manufacturer / industry specification for the component involved (for example: "how to test an alternator charging output specification", "power steering pressure test spec", "wheel bearing endplay spec"). Run a second search if the first doesn't give you both the procedure and the numeric spec. Base the test procedure and the spec numbers you cite on what you actually find in the search results.
+// The Story prompt is assembled per request from the technician's chosen options.
+// Everything that "strengthens" a story is OPT-IN, so the writer decides how much
+// documentation to add and stays responsible for it — nothing is forced.
+//   opts.search   -> look up the documented test procedure & spec online (adds cited sources)
+//   opts.readings -> allow SUGGESTED failure readings (with [CONFIRM] markers) the writer verifies
+function storySystem(opts) {
+  opts = opts || {};
+  let s = `You are a master service writer at a top franchise dealership. A technician — who may be non-technical or write in rough shorthand — gives you notes about a CUSTOMER-PAY repair (this is NOT a warranty claim). Turn their notes into clean, professional, dealer-grade repair documentation.
 
 Return ONLY a JSON object (no markdown fences, no commentary) in exactly this shape:
 {
   "complaint": "the customer's concern, written cleanly and professionally - what they reported / why they came in",
-  "cause": "what the technician found, written as a professional diagnosis: name the test(s) performed, the specification the component is measured against, the reading obtained, and the conclusion (how that reading is out of spec and confirms the failure). Readable but technical.",
-  "correction": "what was done to correct it: specific, including parts replaced or serviced and the post-repair verification (re-test or road test confirming the reading is now in spec)",
-  "customer": "a short, friendly, plain-English explanation for the customer (2-4 sentences) - what was wrong and what you did, written to justify the work and build trust, with NO jargon or part numbers",
-  "readings": [
-    { "label": "what is being measured, e.g. 'Alternator charging output at idle'", "suggested": "a typical FAILURE-consistent value the writer MUST confirm or replace with the real reading, e.g. '11.9 V'", "spec": "the documented in-spec value or range you found, e.g. '13.5-14.8 V' " }
-  ],
-  "tips": ["OPTIONAL: 1-3 short suggestions if the notes are missing a detail that would strengthen the write-up; empty array if complete"]
+  "cause": "what the technician found and diagnosed, written professionally and specifically but readable",
+  "correction": "what was done to correct it: parts replaced or serviced, plus any verification or road test the tech mentioned",
+  "customer": "a short, friendly, plain-English explanation for the customer (2-4 sentences) - what was wrong and what you did, no jargon or part numbers",
+  "readings": [ { "label": "what is measured", "suggested": "a failure-consistent value to CONFIRM", "spec": "the in-spec value/range" } ],
+  "tips": ["OPTIONAL: 1-3 short suggestions of details that would strengthen the write-up; empty array if none"]
 }
 
-Rules:
-- CRITICAL / LEGAL: Only the technician can supply real measurements. If the tech gave a reading, use it. If the tech did NOT give a reading, you may SUGGEST a typical failure value so the story reads professionally, but you MUST (a) list every such suggested number in the "readings" array, and (b) write it in the cause/correction with a confirm marker in brackets, e.g. "measured [CONFIRM: 11.9 V] against a spec of 13.5-14.8 V". Never present a suggested number as if it were actually measured. The writer replaces these with real readings before submitting.
-- Put the manufacturer/industry SPEC you found (which is a published fact, not a measurement) in "spec". Put suggested-but-unconfirmed readings in "suggested".
-- The test procedure and spec you describe should reflect real documented procedure from your web search, not guesswork. If search finds nothing usable, describe the standard accepted test generally and add a tip to verify the spec.
+Core rules:
 - This is a CUSTOMER-PAY repair. Do NOT mention warranty, causal parts, condition codes, labor operations, prior approval, or any manufacturer claim rules. Keep it universal to any vehicle make and any shop.
-- Be concise and honest. Professional polish is the goal; fabrication is not. Do not pad or overstate the work.
-- IMPORTANT OUTPUT RULE: You may use the search tool first, but your FINAL message must be ONLY the JSON object above — no preamble, no explanation, no closing remarks, no markdown fences. Just the raw JSON, starting with { and ending with }.`;
+- Be concise and honest. Professional polish is the goal; do not pad or overstate the work.`;
+
+  if (opts.readings) {
+    s += `
+
+TESTING & READINGS (enabled by the writer):
+- Write the cause and correction as a professional diagnosis: name the test performed, the specification the part is measured against, the reading obtained, and the conclusion that confirms the failure.
+- If the technician gave a real reading, use it. If they did NOT, you MAY suggest a typical FAILURE-consistent value so the story reads professionally — but you MUST (a) list every suggested number in the "readings" array, and (b) write it in the story with a confirm marker in brackets, e.g. "measured [CONFIRM: 11.9 V] against spec 13.5-14.8 V". Never present a suggested number as if it were actually measured; the writer replaces these before submitting.`;
+  } else {
+    s += `
+
+NO INVENTED NUMBERS (the writer chose a plain write-up):
+- CRITICAL: Use ONLY the facts and numbers the technician actually wrote. Do NOT invent, suggest, estimate, or add ANY measurement, reading, test value, or numeric specification the technician did not provide. Do NOT add [CONFIRM] placeholders.
+- The "readings" array MUST be empty. Write the cause and correction cleanly and professionally from exactly what the tech gave you. If a measurement or test would have strengthened it, you may note that as a suggestion in "tips" — but never place a number in the story that the technician did not write.`;
+  }
+
+  if (opts.search) {
+    s += `
+
+WEB LOOKUP (enabled by the writer):
+- You have a web_search tool. Use it to look up the documented diagnostic procedure and the manufacturer / industry specification for the component, and base the procedure${opts.readings ? " and spec numbers" : ""} you describe on what you actually find.${opts.readings ? "" : " Because suggested numbers are turned off, do NOT insert specific numeric spec values into the story — describe the test qualitatively and let the cited sources carry the numbers."}`;
+  } else {
+    s += `
+
+NO WEB LOOKUP:
+- Do not use any tools. Write from the technician's notes and general professional knowledge. Do not add web citations.`;
+  }
+
+  s += `
+
+IMPORTANT OUTPUT RULE: ${opts.search ? "You may use the search tool first, but your " : "Your "}FINAL message must be ONLY the JSON object above — no preamble, no commentary, no markdown fences. Just the raw JSON, starting with { and ending with }.`;
+  return s;
+}
 
 // Collect the web sources behind a story. Pulls from BOTH (a) inline text
 // citations and (b) web_search_tool_result blocks — the latter capture what was
@@ -1141,10 +1172,10 @@ function parseStoryJSON(content) {
 // The Story engine can run on its own model so we can point it at one that
 // supports the web_search tool without touching the warranty reviewer.
 const STORY_MODEL = process.env.STORY_MODEL || "claude-sonnet-4-5";
-async function callStoryAPI(input, useSearch, withTemp = true) {
+async function callStoryAPI(input, system, useSearch, withTemp = true) {
   const body = {
     model: STORY_MODEL, max_tokens: 3500,
-    system: STORY_SYSTEM, messages: [{ role: "user", content: input }],
+    system, messages: [{ role: "user", content: input }],
   };
   // Newer models (Sonnet 5+) deprecated `temperature`; include it only when accepted.
   if (withTemp) body.temperature = 0.4;
@@ -1158,33 +1189,41 @@ async function callStoryAPI(input, useSearch, withTemp = true) {
   if (!r.ok) {
     const msg = data?.error?.message || "AI service error " + r.status;
     // If the model rejects `temperature`, retry once without it.
-    if (withTemp && /temperature/i.test(msg)) return callStoryAPI(input, useSearch, false);
+    if (withTemp && /temperature/i.test(msg)) return callStoryAPI(input, system, useSearch, false);
     const err = new Error(msg); err.status = r.status; throw err;
   }
   return data;
 }
 
-async function storyWrite(input) {
-  if (MOCK) return normalizeStory({
-    complaint: "Customer states the battery warning light is on and the vehicle nearly stalled.",
-    cause: "Performed a charging-system test. Alternator output measured [CONFIRM: 11.9 V] at idle against a specification of 13.5-14.8 V, confirming the alternator is not charging and has failed internally.",
-    correction: "Replaced the alternator, cleaned the battery terminals, and re-tested. Charging output now reads [CONFIRM: 14.2 V], within specification. Road-tested; warning light off.",
-    customer: "Your battery light was on because the part that keeps your battery charged while you drive had stopped working. We replaced it and confirmed the system is charging correctly, so you're good to go.",
-    readings: [{ label: "Alternator charging output at idle", suggested: "11.9 V", spec: "13.5-14.8 V" }],
-    tips: ["Record your actual voltmeter reading in place of the confirm value."],
-  }, [{ url: "https://example.com/alternator-test", title: "Charging System Diagnosis" }]);
-
-  // Attempt 1: live web search. Best-effort — if the search response errors OR
-  // doesn't parse as clean JSON, fall back to a plain call so the tool never fails.
-  try {
-    const data = await callStoryAPI(input, true);
-    const o = parseStoryJSON(data.content);
-    return normalizeStory(o, collectStorySources(data.content));
-  } catch (e) {
-    try { console.log("STORY search attempt failed (" + (e && e.message) + "); falling back to no-search call"); } catch (_) {}
+async function storyWrite(input, opts) {
+  opts = opts || {};
+  if (MOCK) {
+    const base = {
+      complaint: "Customer states the battery warning light is on and the vehicle nearly stalled.",
+      cause: opts.readings
+        ? "Performed a charging-system test. Alternator output measured [CONFIRM: 11.9 V] at idle against a specification of 13.5-14.8 V, confirming the alternator has failed."
+        : "Tested the charging system and found the alternator was not charging the battery. Confirmed the alternator had failed internally.",
+      correction: "Replaced the alternator, cleaned the battery terminals, and road-tested; warning light off.",
+      customer: "Your battery light was on because the part that keeps your battery charged had stopped working. We replaced it and confirmed the system is charging correctly.",
+      readings: opts.readings ? [{ label: "Alternator charging output at idle", suggested: "11.9 V", spec: "13.5-14.8 V" }] : [],
+      tips: [],
+    };
+    return normalizeStory(base, opts.search ? [{ url: "https://example.com/alternator-test", title: "Charging System Diagnosis" }] : []);
   }
-  // Attempt 2: no search — reliable structured JSON.
-  const data = await callStoryAPI(input, false);
+
+  const system = storySystem(opts);
+  // If the writer enabled web lookup, try it first (best-effort). If the search
+  // response errors or doesn't parse as clean JSON, fall back to a no-tool call.
+  if (opts.search) {
+    try {
+      const data = await callStoryAPI(input, system, true);
+      const o = parseStoryJSON(data.content);
+      return normalizeStory(o, collectStorySources(data.content));
+    } catch (e) {
+      try { console.log("STORY search attempt failed (" + (e && e.message) + "); falling back to no-search call"); } catch (_) {}
+    }
+  }
+  const data = await callStoryAPI(input, system, false);
   const o = parseStoryJSON(data.content);
   return normalizeStory(o, []);
 }
@@ -1721,16 +1760,17 @@ app.post("/api/story", async (req, res) => {
   const done = String(b.done || "").trim();
   const details = String(b.details || "").trim();
   const component = String(b.component || "").trim();
+  const opts = { search: b.search === true, readings: b.readings === true };
   if (!concern || !found || !done) return res.status(400).json({ error: "Fill in the concern, what you found, and what you did." });
   const input = "TECHNICIAN NOTES for a customer-pay repair:\n\n"
     + (details ? "VEHICLE / DETAILS: " + details + "\n\n" : "")
-    + (component ? "FAILED COMPONENT (search its documented test procedure & spec): " + component + "\n\n" : "")
+    + (component ? "FAILED COMPONENT" + (opts.search ? " (look up its documented test procedure & spec)" : "") + ": " + component + "\n\n" : "")
     + "CUSTOMER CONCERN: " + concern + "\n\n"
     + "WHAT I FOUND: " + found + "\n\n"
     + "WHAT I DID: " + done;
   if (input.length > 12000) return res.status(400).json({ error: "That's a lot of text — trim it down a bit." });
   try {
-    const story = await storyWrite(input);
+    const story = await storyWrite(input, opts);
     res.json({ story });
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
