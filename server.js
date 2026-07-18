@@ -1132,11 +1132,13 @@ function parseStoryJSON(content) {
 // The Story engine can run on its own model so we can point it at one that
 // supports the web_search tool without touching the warranty reviewer.
 const STORY_MODEL = process.env.STORY_MODEL || "claude-sonnet-4-5";
-async function callStoryAPI(input, useSearch) {
+async function callStoryAPI(input, useSearch, withTemp = true) {
   const body = {
-    model: STORY_MODEL, max_tokens: 2200, temperature: 0.4,
+    model: STORY_MODEL, max_tokens: 2200,
     system: STORY_SYSTEM, messages: [{ role: "user", content: input }],
   };
+  // Newer models (Sonnet 5+) deprecated `temperature`; include it only when accepted.
+  if (withTemp) body.temperature = 0.4;
   if (useSearch) body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }];
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -1144,7 +1146,12 @@ async function callStoryAPI(input, useSearch) {
     body: JSON.stringify(body),
   });
   const data = await r.json();
-  if (!r.ok) { const err = new Error(data?.error?.message || "AI service error " + r.status); err.status = r.status; throw err; }
+  if (!r.ok) {
+    const msg = data?.error?.message || "AI service error " + r.status;
+    // If the model rejects `temperature`, retry once without it.
+    if (withTemp && /temperature/i.test(msg)) return callStoryAPI(input, useSearch, false);
+    const err = new Error(msg); err.status = r.status; throw err;
+  }
   return data;
 }
 
