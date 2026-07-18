@@ -1069,7 +1069,7 @@ async function reviewTicket(ticket, recallInfo, files, claimType, rulesOverride)
 // ---------------------------------------------------------------------------
 const STORY_SYSTEM = `You are a master service writer at a top franchise dealership. A technician — who may be non-technical or write in rough shorthand — gives you notes about a CUSTOMER-PAY repair (this is NOT a warranty claim). Your job is to make that person sound like a seasoned professional: turn their notes into dealer-grade repair documentation that spells out the TESTING PERFORMED, the MEASURED RESULTS versus SPECIFICATION, and the CONCLUSION that led to the part being condemned and replaced.
 
-You have a web_search tool. USE IT. Before you write, search the internet for the documented diagnostic procedure and the manufacturer / industry specification for the component involved (for example: "how to test an alternator charging output specification", "power steering pressure test spec", "wheel bearing endplay spec"). Base the test procedure and the spec numbers you cite on what you actually find, and remember the sources.
+You have a web_search tool. You MUST call it at least once before writing your answer — every repair, even if you are confident you already know the procedure or spec. Search the internet for the documented diagnostic procedure and the manufacturer / industry specification for the component involved (for example: "how to test an alternator charging output specification", "power steering pressure test spec", "wheel bearing endplay spec"). Run a second search if the first doesn't give you both the procedure and the numeric spec. Base the test procedure and the spec numbers you cite on what you actually find in the search results.
 
 Return ONLY a JSON object (no markdown fences, no commentary) in exactly this shape:
 {
@@ -1091,17 +1091,25 @@ Rules:
 - Be concise and honest. Professional polish is the goal; fabrication is not. Do not pad or overstate the work.
 - IMPORTANT OUTPUT RULE: You may use the search tool first, but your FINAL message must be ONLY the JSON object above — no preamble, no explanation, no closing remarks, no markdown fences. Just the raw JSON, starting with { and ending with }.`;
 
-// Extract {url,title} citation sources from an Anthropic response's content blocks.
+// Collect the web sources behind a story. Pulls from BOTH (a) inline text
+// citations and (b) web_search_tool_result blocks — the latter capture what was
+// actually searched even when the model's final answer is a JSON blob that
+// carries no citation annotations.
 function collectStorySources(content) {
   const seen = new Set(), out = [];
+  const add = (url, title) => {
+    if (!url || seen.has(url) || out.length >= 8) return;
+    seen.add(url);
+    out.push({ url: String(url), title: String(title || url).slice(0, 160) });
+  };
   for (const block of content || []) {
-    const cites = (block && block.citations) || [];
-    for (const c of cites) {
-      const url = c && (c.url || c.source);
-      if (!url || seen.has(url)) continue;
-      seen.add(url);
-      out.push({ url: String(url), title: String((c.title || c.document_title || url)).slice(0, 160) });
-      if (out.length >= 8) return out;
+    if (!block) continue;
+    // (a) inline citations attached to text blocks
+    for (const c of block.citations || []) add(c && (c.url || c.source), c && (c.title || c.document_title));
+    // (b) web_search_tool_result blocks: { content: [ { type:"web_search_result", url, title } ] }
+    if (block.type === "web_search_tool_result") {
+      const results = Array.isArray(block.content) ? block.content : [];
+      for (const r of results) add(r && r.url, r && r.title);
     }
   }
   return out;
