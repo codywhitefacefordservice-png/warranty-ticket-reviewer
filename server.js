@@ -1088,7 +1088,8 @@ Rules:
 - Put the manufacturer/industry SPEC you found (which is a published fact, not a measurement) in "spec". Put suggested-but-unconfirmed readings in "suggested".
 - The test procedure and spec you describe should reflect real documented procedure from your web search, not guesswork. If search finds nothing usable, describe the standard accepted test generally and add a tip to verify the spec.
 - This is a CUSTOMER-PAY repair. Do NOT mention warranty, causal parts, condition codes, labor operations, prior approval, or any manufacturer claim rules. Keep it universal to any vehicle make and any shop.
-- Be concise and honest. Professional polish is the goal; fabrication is not. Do not pad or overstate the work.`;
+- Be concise and honest. Professional polish is the goal; fabrication is not. Do not pad or overstate the work.
+- IMPORTANT OUTPUT RULE: You may use the search tool first, but your FINAL message must be ONLY the JSON object above — no preamble, no explanation, no closing remarks, no markdown fences. Just the raw JSON, starting with { and ending with }.`;
 
 // Extract {url,title} citation sources from an Anthropic response's content blocks.
 function collectStorySources(content) {
@@ -1134,7 +1135,7 @@ function parseStoryJSON(content) {
 const STORY_MODEL = process.env.STORY_MODEL || "claude-sonnet-4-5";
 async function callStoryAPI(input, useSearch, withTemp = true) {
   const body = {
-    model: STORY_MODEL, max_tokens: 2200,
+    model: STORY_MODEL, max_tokens: 3500,
     system: STORY_SYSTEM, messages: [{ role: "user", content: input }],
   };
   // Newer models (Sonnet 5+) deprecated `temperature`; include it only when accepted.
@@ -1165,18 +1166,19 @@ async function storyWrite(input) {
     tips: ["Record your actual voltmeter reading in place of the confirm value."],
   }, [{ url: "https://example.com/alternator-test", title: "Charging System Diagnosis" }]);
 
-  // Try with live web search first; fall back to a plain call if the model/account
-  // rejects the tool so the tool still works even where search is unavailable.
-  let data, usedSearch = true;
+  // Attempt 1: live web search. Best-effort — if the search response errors OR
+  // doesn't parse as clean JSON, fall back to a plain call so the tool never fails.
   try {
-    data = await callStoryAPI(input, true);
+    const data = await callStoryAPI(input, true);
+    const o = parseStoryJSON(data.content);
+    return normalizeStory(o, collectStorySources(data.content));
   } catch (e) {
-    data = await callStoryAPI(input, false);
-    usedSearch = false;
+    try { console.log("STORY search attempt failed (" + (e && e.message) + "); falling back to no-search call"); } catch (_) {}
   }
+  // Attempt 2: no search — reliable structured JSON.
+  const data = await callStoryAPI(input, false);
   const o = parseStoryJSON(data.content);
-  const sources = usedSearch ? collectStorySources(data.content) : [];
-  return normalizeStory(o, sources);
+  return normalizeStory(o, []);
 }
 
 // ---------------------------------------------------------------------------
