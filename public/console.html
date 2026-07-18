@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Owner Console — ClaimProof</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#12294d; --brand-2:#2f80ed; --accent:#2f80ed;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8; --good:#0a8a3a; --bad:#c8102e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#2b527f; --brand-2:#5b8def;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442; --good:#38c172; --bad:#ef5a6f; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#fff;border-bottom:3px solid var(--brand)}
+  .accent{height:2px;background:var(--accent)}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .topbar svg{height:44px;width:auto;display:block}
+  .nav a{color:var(--ink-2);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px}
+  .nav a:hover{color:var(--brand-2)}
+  .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  h2{font-size:14px;margin:0 0 12px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--brand)}
+  @media (prefers-color-scheme: dark){ h2{color:var(--brand-2)} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,23,38,.04)}
+  label{display:block;font-size:11.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 5px}
+  input,select{width:100%;padding:9px 12px;font-size:14.5px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
+  input:focus,select:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  .row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:640px){ .row{grid-template-columns:1fr} }
+  button{padding:10px 18px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(16,23,38,.06)}
+  button:hover{border-color:var(--brand-2)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(18,41,77,.28)}
+  button.primary:hover{filter:brightness(1.12)}
+  button.mini{padding:5px 11px;font-size:12px;font-weight:700}
+  .store{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:var(--surface)}
+  .store-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .store-logo{width:56px;height:56px;border:1px solid var(--grid);border-radius:8px;object-fit:contain;background:#fff;flex:none}
+  .store-name{font-weight:800;font-size:16px}
+  .store-meta{color:var(--ink-2);font-size:12.5px}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
+  .pill.on{color:var(--good);background:rgba(10,138,58,.12)} .pill.off{color:var(--bad);background:rgba(200,16,46,.12)}
+  .spacer{flex:1}
+  .sub{margin-top:12px;border-top:1px solid var(--grid);padding-top:12px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--grid)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .msg{font-size:13px;margin-top:8px;min-height:18px}
+  .msg.err{color:var(--bad)} .msg.ok{color:var(--good)}
+  .hint{color:var(--muted);font-size:12px}
+  details summary{cursor:pointer;font-weight:700;color:var(--brand-2);font-size:13px;margin-top:6px}
+  .fine{color:var(--muted);font-size:12px;margin-top:22px}
+  .plan{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .plan-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .pill-btn{border-radius:20px}
+  .pill-btn.is-on{background:rgba(10,138,58,.12);border-color:rgba(10,138,58,.45);color:var(--good)}
+  .rule{display:flex;align-items:flex-start;gap:12px;padding:10px 2px;border-bottom:1px solid var(--grid)}
+  .rule:last-child{border-bottom:0}
+  .rule .info{flex:1}
+  .rule .rl{font-weight:700;font-size:13.5px}
+  .rule .rd{color:var(--ink-2);font-size:12.5px;margin-top:2px}
+  .badge2{display:inline-block;margin-left:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#b7791f;background:rgba(183,121,31,.14);border-radius:20px;padding:1px 7px;vertical-align:1px}
+  .sw{position:relative;width:44px;height:24px;flex:none;cursor:pointer;display:inline-block}
+  .sw input{opacity:0;width:0;height:0;position:absolute}
+  .sw .tr{position:absolute;inset:0;background:#c3ccd8;border-radius:24px;transition:.15s}
+  .sw .kn{position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .sw input:checked ~ .tr{background:var(--good)}
+  .sw input:checked ~ .kn{transform:translateX(20px)}
+  .modal{position:fixed;inset:0;background:rgba(8,14,26,.55);display:none;place-items:center;z-index:50;padding:16px}
+  .modal.on{display:grid}
+  .modal .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;max-width:460px;padding:22px 24px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+  .modal h3{margin:0 0 10px;font-size:16px;color:var(--bad)}
+  .modal p{font-size:14px;color:var(--ink);margin:0 0 8px}
+  .modal .sub2{color:var(--ink-2);font-size:13px}
+  .modal .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  .modal .danger{background:var(--bad);border-color:var(--bad);color:#fff}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <svg viewBox="0 0 560 150" aria-label="ClaimProof">
+    <defs><linearGradient id="cpShield" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f80ed"/><stop offset="1" stop-color="#1b56b0"/></linearGradient></defs>
+    <path d="M62 10 L110 28 L110 76 C110 106 88 126 62 140 C36 126 14 106 14 76 L14 28 Z" fill="#12294d"/>
+    <path d="M62 18 L103 33 L103 75 C103 101 84 118 62 130 C40 118 21 101 21 75 L21 33 Z" fill="url(#cpShield)"/>
+    <rect x="35" y="41" width="42" height="52" rx="5" fill="#fff"/>
+    <rect x="42" y="52" width="28" height="5" rx="2.5" fill="#12294d"/>
+    <rect x="42" y="63" width="28" height="5" rx="2.5" fill="#2f80ed"/>
+    <rect x="42" y="74" width="20" height="5" rx="2.5" fill="#12294d"/>
+    <path d="M34 78 L52 96 L96 34" fill="none" stroke="#2f80ed" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="140" y="82" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="62" font-weight="800" letter-spacing="-1"><tspan fill="#12294d">Claim</tspan><tspan fill="#2f80ed">Proof</tspan></text>
+    <rect x="142" y="98" width="404" height="3" rx="1.5" fill="#2f80ed"/>
+    <text x="144" y="126" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="23" font-weight="600" fill="#1c3a5e">Stronger Claims. Fewer chargebacks.</text>
+  </svg>
+  <nav class="nav"><a href="/">Reviewer</a><a href="/logout">Sign out</a></nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">Owner Console</div>
+  <div class="page-sub">Add dealerships, give each its own logo and advisor logins, and switch access on or off. Each store only ever sees its own claims.</div>
+
+  <div class="card">
+    <h2>Add a store</h2>
+    <div class="row">
+      <div><label>Dealership name</label><input id="ns-name" placeholder="e.g. Bravo Ford"></div>
+      <div><label>City / location</label><input id="ns-city" placeholder="e.g. Amarillo, TX"></div>
+      <div><label>Login slug <span class="hint">(optional)</span></label><input id="ns-slug" placeholder="auto from name"></div>
+    </div>
+    <div style="margin-top:12px"><button class="primary" id="ns-add">Create store</button></div>
+    <div class="msg" id="ns-msg"></div>
+  </div>
+
+  <h2 style="margin-top:8px">Stores</h2>
+  <div id="stores"></div>
+
+  <div class="fine">ClaimProof — Owner Console. Passwords are stored only as secure hashes. Billing (subscriptions) is set up separately.</div>
+</div>
+
+<div class="modal" id="rmodal">
+  <div class="box">
+    <h3>Heads up — this weakens grading</h3>
+    <p id="rmodal-text"></p>
+    <p class="sub2">Turning this off can cause claim issues. With it off, ClaimProof cannot guarantee the grading quality on affected claims for this store.</p>
+    <div class="acts">
+      <button id="rmodal-cancel">Cancel</button>
+      <button class="danger" id="rmodal-ok">I understand, turn it off</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (s,el)=> (el||document).querySelector(s);
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+let DATA = {stores:[], users:[]};
+
+async function load(){
+  const r = await fetch("/api/owner/stores");
+  if(r.status===403){ document.body.innerHTML="<p style='padding:40px;text-align:center'>Owner access only. <a href='/'>Back to reviewer</a></p>"; return; }
+  if(!r.ok){ return; }
+  DATA = await r.json();
+  render();
+}
+function usersFor(id){ return DATA.users.filter(u=>u.storeId===id); }
+function render(){
+  const wrap = $("#stores");
+  if(!DATA.stores.length){ wrap.innerHTML="<div class='card hint'>No stores yet — add one above.</div>"; return; }
+  wrap.innerHTML = DATA.stores.map(s=>{
+    const us = usersFor(s.id);
+    const rows = us.map(u=>`<tr>
+        <td>${esc(u.name||"—")}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td>
+        <td><span class="pill ${u.active?'on':'off'}">${u.active?'active':'off'}</span></td>
+        <td style="text-align:right">${u.role==='owner'?'':`<button class="mini" data-uact="${u.id}" data-to="${u.active?0:1}">${u.active?'Deactivate':'Activate'}</button>`}</td>
+      </tr>`).join("") || `<tr><td colspan="5" class="hint">No users yet.</td></tr>`;
+    return `<div class="store">
+      <div class="store-head">
+        <img class="store-logo" src="/store-logo/${s.id}?v=${Date.now()}" onerror="this.style.visibility='hidden'">
+        <div>
+          <div class="store-name">${esc(s.name)}</div>
+          <div class="store-meta">${esc(s.city||"")} · /s/${esc(s.slug)} · ${s.users} user(s)</div>
+        </div>
+        <span class="pill ${s.active?'on':'off'}">${s.active?'active':'inactive'}</span>
+        <div class="spacer"></div>
+        <button class="mini" data-sact="${s.id}" data-to="${s.active?0:1}">${s.active?'Deactivate':'Activate'}</button>
+        <label class="mini" style="display:inline-block;margin:0">
+          <button class="mini" type="button" data-logobtn="${s.id}">Upload logo</button>
+          <input type="file" accept="image/png,image/jpeg,image/webp" data-logo="${s.id}" style="display:none">
+        </label>
+      </div>
+      <div class="plan">
+        <span class="plan-label">Plan / subscription:</span>
+        <button class="mini pill-btn ${s.features&&s.features.story?'is-on':''}" data-feat="story" data-sid="${s.id}" data-to="${s.features&&s.features.story?0:1}">Repair Story ${s.features&&s.features.story?'✓':'—'}</button>
+        <button class="mini pill-btn ${s.features&&s.features.warranty?'is-on':''}" data-feat="warranty" data-sid="${s.id}" data-to="${s.features&&s.features.warranty?0:1}">Warranty tools ${s.features&&s.features.warranty?'✓':'—'}</button>
+        <span class="hint">Off means the tool is blocked server-side — the shop can't reach it.</span>
+      </div>
+      <div class="sub">
+        <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+        <details>
+          <summary>Add a user to ${esc(s.name)}</summary>
+          <div class="row" style="margin-top:10px">
+            <div><label>Name</label><input data-nu-name="${s.id}" placeholder="Advisor name"></div>
+            <div><label>Email</label><input data-nu-email="${s.id}" placeholder="advisor@store.com"></div>
+            <div><label>Temp password</label><input data-nu-pass="${s.id}" placeholder="they can change later"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <div><label>Role</label><select data-nu-role="${s.id}"><option value="advisor">Advisor</option><option value="admin">Store admin</option></select></div>
+          </div>
+          <div style="margin-top:12px"><button class="primary" data-nu-add="${s.id}">Add user</button></div>
+          <div class="msg" data-nu-msg="${s.id}"></div>
+        </details>
+        <details data-rules-wrap="${s.id}">
+          <summary>Grading rules for ${esc(s.name)}</summary>
+          <div class="hint" style="margin:8px 0 4px">Turn ClaimProof's grading rules on or off for this store only — no other store is affected. Turning a safeguard off shows a warning first.</div>
+          <div data-rules="${s.id}"><span class="hint">Loading…</span></div>
+        </details>
+      </div>
+    </div>`;
+  }).join("");
+  wire();
+}
+function wire(){
+  document.querySelectorAll("[data-logobtn]").forEach(b=>b.onclick=()=>{ document.querySelector(`input[data-logo="${b.dataset.logobtn}"]`).click(); });
+  document.querySelectorAll("input[data-logo]").forEach(inp=>inp.onchange=async()=>{
+    const f=inp.files[0]; if(!f) return;
+    const r=await fetch(`/api/owner/stores/${inp.dataset.logo}/logo`,{method:"PUT",headers:{"content-type":f.type||"image/png"},body:f});
+    if(r.ok){ load(); } else { alert("Logo upload failed."); }
+  });
+  document.querySelectorAll("[data-sact]").forEach(b=>b.onclick=async()=>{
+    await fetch(`/api/owner/stores/${b.dataset.sact}/active`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({active:b.dataset.to==="1"})}); load();
+  });
+  document.querySelectorAll("[data-uact]").forEach(b=>b.onclick=async()=>{
+    await fetch(`/api/owner/users/${b.dataset.uact}/active`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({active:b.dataset.to==="1"})}); load();
+  });
+  document.querySelectorAll("[data-feat]").forEach(b=>b.onclick=async()=>{
+    const body={}; body[b.dataset.feat]=(b.dataset.to==="1");
+    const r=await fetch(`/api/owner/stores/${b.dataset.sid}/features`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    if(r.ok) load(); else alert("Couldn't update the plan.");
+  });
+  document.querySelectorAll("[data-nu-add]").forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.nuAdd;
+    const body={ storeId:id,
+      name:$(`[data-nu-name="${id}"]`).value.trim(),
+      email:$(`[data-nu-email="${id}"]`).value.trim(),
+      password:$(`[data-nu-pass="${id}"]`).value,
+      role:$(`[data-nu-role="${id}"]`).value };
+    const m=$(`[data-nu-msg="${id}"]`);
+    if(!body.email||!body.password){ m.className="msg err"; m.textContent="Email and a temporary password are required."; return; }
+    const r=await fetch("/api/owner/users",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(r.ok){ m.className="msg ok"; m.textContent="User added."; load(); }
+    else { m.className="msg err"; m.textContent=d.error||"Could not add user."; }
+  });
+  document.querySelectorAll("[data-rules-wrap]").forEach(dt=>{
+    dt.addEventListener("toggle",()=>{ if(dt.open && !dt.dataset.loaded){ dt.dataset.loaded="1"; loadRules(dt.getAttribute("data-rules-wrap")); } });
+  });
+}
+
+let RULEMETA={};
+async function loadRules(id){
+  const box=$(`[data-rules="${id}"]`);
+  const r=await fetch(`/api/owner/stores/${id}/rules`);
+  if(!r.ok){ box.innerHTML="<span class='msg err'>Couldn't load rules.</span>"; return; }
+  const d=await r.json();
+  RULEMETA[id]={}; d.rules.forEach(rl=>RULEMETA[id][rl.key]=rl);
+  box.innerHTML=d.rules.map(rl=>`
+    <div class="rule">
+      <div class="info"><div class="rl">${esc(rl.label)}${rl.deviates?'<span class="badge2">customized</span>':''}</div><div class="rd">${esc(rl.desc)}</div></div>
+      <label class="sw"><input type="checkbox" data-rk="${rl.key}" data-sid="${id}" ${rl.enabled?'checked':''}><span class="tr"></span><span class="kn"></span></label>
+    </div>`).join("");
+  box.querySelectorAll("input[data-rk]").forEach(inp=>inp.addEventListener("change",()=>onToggle(inp)));
+}
+let PENDING=null;
+function onToggle(inp){
+  const sid=inp.dataset.sid, key=inp.dataset.rk, meta=RULEMETA[sid][key];
+  const next=inp.checked;
+  const weaken = (next!==meta.def) && meta.disclaimer;
+  if(weaken){
+    PENDING={inp,sid,key,next};
+    $("#rmodal-text").textContent='Turn off "'+meta.label+'" for this store?';
+    $("#rmodal").classList.add("on");
+  } else {
+    saveRule(sid,key,next,false,inp);
+  }
+}
+async function saveRule(sid,key,enabled,ack,inp){
+  const r=await fetch(`/api/owner/stores/${sid}/rules`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key,enabled,ack})});
+  if(!r.ok){ const d=await r.json().catch(()=>({})); alert(d.error||"Couldn't save that change."); if(inp) inp.checked=!enabled; return; }
+  loadRules(sid);
+}
+$("#rmodal-cancel").onclick=()=>{ if(PENDING){ PENDING.inp.checked=!PENDING.next; } $("#rmodal").classList.remove("on"); PENDING=null; };
+$("#rmodal-ok").onclick=async()=>{ if(!PENDING)return; const p=PENDING; PENDING=null; $("#rmodal").classList.remove("on"); await saveRule(p.sid,p.key,p.next,true,p.inp); };
+$("#ns-add").onclick=async()=>{
+  const name=$("#ns-name").value.trim(), city=$("#ns-city").value.trim(), slug=$("#ns-slug").value.trim();
+  const m=$("#ns-msg");
+  if(!name){ m.className="msg err"; m.textContent="Dealership name is required."; return; }
+  const r=await fetch("/api/owner/stores",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name,city,slug})});
+  const d=await r.json();
+  if(r.ok){ m.className="msg ok"; m.textContent="Store created."; $("#ns-name").value=$("#ns-city").value=$("#ns-slug").value=""; load(); }
+  else { m.className="msg err"; m.textContent=d.error||"Could not create store."; }
+};
+load();
+</script>
+</body>
+</html>
