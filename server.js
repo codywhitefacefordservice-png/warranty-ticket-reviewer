@@ -467,6 +467,28 @@ function saveHistory() {
   }
 }
 
+// Repair Story usage log. Kept in its OWN file so customer-pay Story data stays
+// walled off from warranty history — the reporting tool reads it separately.
+const STORY_USAGE_FILE = path.join(HISTORY_DIR, "story_usage.json");
+let STORY_USAGE = [];
+try {
+  if (fs.existsSync(STORY_USAGE_FILE)) STORY_USAGE = JSON.parse(fs.readFileSync(STORY_USAGE_FILE, "utf8"));
+} catch (e) { console.error("Story usage load failed:", e.message); }
+function saveStoryUsage() {
+  try {
+    if (STORY_USAGE.length > 5000) STORY_USAGE = STORY_USAGE.slice(-5000);
+    const tmp = STORY_USAGE_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(STORY_USAGE));
+    fs.renameSync(tmp, STORY_USAGE_FILE);
+  } catch (e) { console.error("Story usage save failed:", e.message); }
+}
+function logStoryUsage(rec) {
+  rec.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  rec.ts = new Date().toISOString();
+  STORY_USAGE.push(rec);
+  saveStoryUsage();
+}
+
 const EXT_BY_TYPE = {
   "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
   "image/webp": ".webp", "application/pdf": ".pdf",
@@ -1330,7 +1352,12 @@ const APPBRAND_JS = `(function(){
     try{
       var nav=document.querySelector(".nav");
       if(nav){
-        if(!feat.warranty){ ["/","/appeal","/history","/resources"].forEach(function(h){ var a=nav.querySelector('a[href="'+h+'"]'); if(a) a.style.display="none"; }); }
+        if(!feat.warranty){ ["/","/appeal","/history","/resources","/reports"].forEach(function(h){ var a=nav.querySelector('a[href="'+h+'"]'); if(a) a.style.display="none"; }); }
+        if(feat.warranty && !nav.querySelector("[data-reports]")){
+          var hist=nav.querySelector('a[href="/history"]');
+          var rp=document.createElement("a"); rp.href="/reports"; rp.textContent="Reports"; rp.setAttribute("data-reports","1"); if(location.pathname==="/reports") rp.className="active";
+          if(hist) nav.insertBefore(rp, hist.nextSibling||null); else nav.appendChild(rp);
+        }
         if(feat.story && !nav.querySelector("[data-story]")){
           var ref=nav.querySelector('a[href="/"]');
           var sy=document.createElement("a"); sy.href="/story"; sy.textContent="Story"; sy.setAttribute("data-story","1"); if(location.pathname==="/story") sy.className="active";
@@ -1388,7 +1415,7 @@ app.put("/resources/upload/:key", express.raw({ type: ["application/pdf", "appli
 app.use((req, res, next) => {
   const ctx = sessionCtx(req);
   if (ctx) { req.ctx = ctx; return next(); }
-  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history" || req.path === "/resources" || req.path === "/console" || req.path === "/account" || req.path === "/story") && req.method === "GET") {
+  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history" || req.path === "/resources" || req.path === "/reports" || req.path === "/console" || req.path === "/account" || req.path === "/story") && req.method === "GET") {
     return res.send(LOGIN_PAGE.replace("<!--MSG-->", ""));
   }
   return res.status(401).json({ error: "not logged in" });
@@ -1399,9 +1426,9 @@ app.use((req, res, next) => {
 // hiding nav links is cosmetic; THIS is what stops anyone getting tools free.
 function featureForPath(p) {
   if (p === "/story" || p === "/api/story") return "story";
-  if (p === "/" || p === "/appeal" || p === "/history" || p === "/resources") return "warranty";
+  if (p === "/" || p === "/appeal" || p === "/history" || p === "/resources" || p === "/reports") return "warranty";
   if (p === "/api/review" || p === "/api/appeal" || p === "/api/resources") return "warranty";
-  if (p.indexOf("/api/history") === 0 || p.indexOf("/resources/file") === 0) return "warranty";
+  if (p.indexOf("/api/history") === 0 || p.indexOf("/resources/file") === 0 || p.indexOf("/api/reports") === 0) return "warranty";
   return null; // shared (account, me, owner, logos, etc.) - never gated
 }
 app.use((req, res, next) => {
@@ -1559,6 +1586,8 @@ app.post("/api/appeal", async (req, res) => {
     }
     addHistory({
       storeId: req.ctx.store.id,
+      userId: req.ctx.user.id,
+      userName: req.ctx.user.name || req.ctx.user.email,
       type: "appeal",
       ro: extractRo(rejection + " " + ticket),
       vin: extractVin(rejection + " " + ticket) || "",
@@ -1707,6 +1736,8 @@ app.post("/api/review", async (req, res) => {
     }
     addHistory({
       storeId: req.ctx.store.id,
+      userId: req.ctx.user.id,
+      userName: req.ctx.user.name || req.ctx.user.email,
       type: "review",
       claimType: f.claimType || "",
       claimLabel: (CLAIM_TYPES[f.claimType] && CLAIM_TYPES[f.claimType].label) || "",
@@ -1771,8 +1802,325 @@ app.post("/api/story", async (req, res) => {
   if (input.length > 12000) return res.status(400).json({ error: "That's a lot of text — trim it down a bit." });
   try {
     const story = await storyWrite(input, opts);
+    try {
+      logStoryUsage({
+        storeId: req.ctx.store.id, userId: req.ctx.user.id,
+        userName: req.ctx.user.name || req.ctx.user.email,
+        component: component || "", search: !!opts.search, readings: !!opts.readings,
+      });
+    } catch (_) {}
     res.json({ story });
   } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// ---------------------------------------------------------------------------
+// Reporting engine — build any report over reviews, appeals, or Story usage,
+// with filters, grouping/aggregation, and CSV / Excel / PDF export.
+// Owner sees all stores (optional store filter); everyone else is locked to
+// their own store, server-side. Part of the warranty tier (see featureForPath).
+// ---------------------------------------------------------------------------
+let XLSX_LIB = null; try { XLSX_LIB = require("xlsx"); } catch (_) {}
+let PDFDoc = null; try { PDFDoc = require("pdfkit"); } catch (_) {}
+
+function storeNameById(id) { const s = storeById(id); return s ? s.name : id; }
+function parseNum(v) {
+  if (v == null || v === "") return null;
+  const n = Number(String(v).replace(/[,$\s]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+function yesno(v) { return v ? "Yes" : "No"; }
+
+const REPORT_DATASETS = {
+  reviews: {
+    label: "Warranty reviews",
+    columns: [
+      { key: "ts", label: "Date", type: "date" },
+      { key: "storeName", label: "Store", type: "string" },
+      { key: "userName", label: "Advisor", type: "string" },
+      { key: "ro", label: "RO #", type: "string" },
+      { key: "line", label: "Line", type: "string" },
+      { key: "claimLabel", label: "Claim type", type: "string" },
+      { key: "vin", label: "VIN", type: "string" },
+      { key: "vehicle", label: "Vehicle", type: "string" },
+      { key: "mileage", label: "Mileage", type: "number" },
+      { key: "causalPart", label: "Causal part", type: "string" },
+      { key: "score", label: "Score", type: "number" },
+      { key: "verdict", label: "Verdict", type: "string" },
+      { key: "summary", label: "Summary", type: "string" },
+    ],
+    getRows: (scope) => HISTORY.filter((r) => r.type === "review" && scope.storeIds.has(r.storeId)).map((r) => ({
+      ts: r.ts || "", storeName: storeNameById(r.storeId), userName: r.userName || "", ro: r.ro || "", line: r.line || "",
+      claimLabel: r.claimLabel || r.claimType || "", vin: r.vin || "", vehicle: r.vehicle || "",
+      mileage: parseNum(r.mileage), causalPart: r.causalPart || "", score: (r.score == null ? null : r.score),
+      verdict: r.verdict || "", summary: r.summary || "",
+    })),
+  },
+  appeals: {
+    label: "Appeals",
+    columns: [
+      { key: "ts", label: "Date", type: "date" },
+      { key: "storeName", label: "Store", type: "string" },
+      { key: "userName", label: "Advisor", type: "string" },
+      { key: "ro", label: "RO #", type: "string" },
+      { key: "vin", label: "VIN", type: "string" },
+      { key: "verdict", label: "Strength", type: "string" },
+      { key: "summary", label: "Reason", type: "string" },
+    ],
+    getRows: (scope) => HISTORY.filter((r) => r.type === "appeal" && scope.storeIds.has(r.storeId)).map((r) => ({
+      ts: r.ts || "", storeName: storeNameById(r.storeId), userName: r.userName || "", ro: r.ro || "",
+      vin: r.vin || "", verdict: r.verdict || "", summary: r.summary || "",
+    })),
+  },
+  stories: {
+    label: "Repair Story usage",
+    columns: [
+      { key: "ts", label: "Date", type: "date" },
+      { key: "storeName", label: "Store", type: "string" },
+      { key: "userName", label: "Advisor", type: "string" },
+      { key: "component", label: "Component", type: "string" },
+      { key: "search", label: "Web lookup", type: "string" },
+      { key: "readings", label: "Suggested readings", type: "string" },
+    ],
+    getRows: (scope) => STORY_USAGE.filter((r) => scope.storeIds.has(r.storeId)).map((r) => ({
+      ts: r.ts || "", storeName: storeNameById(r.storeId), userName: r.userName || "",
+      component: r.component || "", search: yesno(r.search), readings: yesno(r.readings),
+    })),
+  },
+};
+
+function reportPresets() {
+  const d = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  return [
+    { id: "rev_by_claim", label: "Reviews — count & avg score by claim type", query: { dataset: "reviews", groupBy: ["claimLabel"], agg: [{ fn: "count" }, { fn: "avg", field: "score" }], sort: { field: "count", dir: "desc" } } },
+    { id: "rev_by_advisor", label: "Reviews — by advisor", query: { dataset: "reviews", groupBy: ["userName"], agg: [{ fn: "count" }, { fn: "avg", field: "score" }], sort: { field: "count", dir: "desc" } } },
+    { id: "rev_low", label: "Reviews — low scores (under 70)", query: { dataset: "reviews", filters: [{ field: "score", op: "lt", value: "70" }], sort: { field: "score", dir: "asc" } } },
+    { id: "rev_detail_30", label: "Reviews — detail, last 30 days", query: { dataset: "reviews", from: d, sort: { field: "ts", dir: "desc" } } },
+    { id: "app_by_strength", label: "Appeals — count by strength", query: { dataset: "appeals", groupBy: ["verdict"], agg: [{ fn: "count" }], sort: { field: "count", dir: "desc" } } },
+    { id: "story_by_advisor", label: "Story usage — by advisor", query: { dataset: "stories", groupBy: ["userName"], agg: [{ fn: "count" }], sort: { field: "count", dir: "desc" } } },
+    { id: "story_detail", label: "Story usage — detail", query: { dataset: "stories", sort: { field: "ts", dir: "desc" } } },
+  ];
+}
+
+function reportScope(req, requestedStoreId) {
+  const isOwner = req.ctx.user.role === "owner";
+  let storeIds;
+  if (isOwner) {
+    storeIds = (requestedStoreId && storeById(requestedStoreId)) ? new Set([requestedStoreId]) : new Set(STORES.map((s) => s.id));
+  } else {
+    storeIds = new Set([req.ctx.store.id]);
+  }
+  return { isOwner, storeIds };
+}
+
+function fmtCell(v, type) {
+  if (v == null || v === "") return "";
+  if (type === "date") return String(v).slice(0, 10);
+  return String(v);
+}
+function cmpVals(a, b) {
+  const an = (a == null || a === ""), bn = (b == null || b === "");
+  if (an && bn) return 0; if (an) return -1; if (bn) return 1;
+  const na = Number(a), nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+  return String(a).localeCompare(String(b));
+}
+function applyFilter(val, op, target, type) {
+  if (op === "empty") return val == null || val === "";
+  if (op === "notempty") return !(val == null || val === "");
+  if (type === "number") {
+    const a = parseNum(val), b = parseNum(target);
+    if (a == null || b == null) return op === "ne";
+    switch (op) { case "eq": return a === b; case "ne": return a !== b; case "gt": return a > b; case "lt": return a < b; case "gte": return a >= b; case "lte": return a <= b; default: return true; }
+  }
+  const s = String(val == null ? "" : val).toLowerCase(), t = String(target == null ? "" : target).toLowerCase();
+  switch (op) {
+    case "eq": return s === t; case "ne": return s !== t; case "contains": return s.indexOf(t) !== -1;
+    case "gt": return s > t; case "lt": return s < t; case "gte": return s >= t; case "lte": return s <= t;
+    default: return true;
+  }
+}
+function normalizeAggs(agg, cols) {
+  const list = Array.isArray(agg) && agg.length ? agg : [{ fn: "count" }];
+  const out = [];
+  for (const a of list) {
+    const fn = ["count", "avg", "sum", "min", "max"].includes(a.fn) ? a.fn : "count";
+    if (fn === "count") { out.push({ key: "count", label: "Count", fn }); continue; }
+    const col = cols.find((c) => c.key === a.field);
+    if (!col) continue;
+    out.push({ key: fn + "_" + a.field, label: fn.charAt(0).toUpperCase() + fn.slice(1) + " " + col.label, fn, field: a.field });
+  }
+  if (!out.length) out.push({ key: "count", label: "Count", fn: "count" });
+  return out;
+}
+function computeAgg(a, items) {
+  if (a.fn === "count") return items.length;
+  const nums = items.map((i) => parseNum(i[a.field])).filter((n) => n != null);
+  if (!nums.length) return null;
+  if (a.fn === "sum") return nums.reduce((x, y) => x + y, 0);
+  if (a.fn === "avg") return Math.round((nums.reduce((x, y) => x + y, 0) / nums.length) * 10) / 10;
+  if (a.fn === "min") return Math.min(...nums);
+  if (a.fn === "max") return Math.max(...nums);
+  return null;
+}
+
+function runReport(q, scope) {
+  q = q || {};
+  const dsKey = REPORT_DATASETS[q.dataset] ? q.dataset : "reviews";
+  const ds = REPORT_DATASETS[dsKey];
+  const cols = ds.columns;
+  let rows = ds.getRows(scope);
+  if (q.from) rows = rows.filter((r) => r.ts && r.ts.slice(0, 10) >= q.from);
+  if (q.to) rows = rows.filter((r) => r.ts && r.ts.slice(0, 10) <= q.to);
+  for (const f of (Array.isArray(q.filters) ? q.filters : [])) {
+    const col = cols.find((c) => c.key === f.field); if (!col) continue;
+    rows = rows.filter((r) => applyFilter(r[f.field], f.op || "contains", f.value, col.type));
+  }
+  const groupBy = (Array.isArray(q.groupBy) ? q.groupBy : []).filter((k) => cols.some((c) => c.key === k));
+  let outCols, outRows;
+  if (groupBy.length) {
+    const aggs = normalizeAggs(q.agg, cols);
+    const groups = new Map();
+    for (const r of rows) {
+      const gk = groupBy.map((k) => fmtCell(r[k], (cols.find((c) => c.key === k) || {}).type)).join(" | ");
+      if (!groups.has(gk)) groups.set(gk, { keyvals: groupBy.map((k) => r[k]), items: [] });
+      groups.get(gk).items.push(r);
+    }
+    outCols = groupBy.map((k) => { const c = cols.find((x) => x.key === k); return { key: k, label: c.label, type: c.type }; })
+      .concat(aggs.map((a) => ({ key: a.key, label: a.label, type: "number" })));
+    outRows = [...groups.values()].map((g) => g.keyvals.concat(aggs.map((a) => computeAgg(a, g.items))));
+  } else {
+    const selKeys = (Array.isArray(q.columns) && q.columns.length) ? q.columns.filter((k) => cols.some((c) => c.key === k)) : cols.map((c) => c.key);
+    outCols = selKeys.map((k) => { const c = cols.find((x) => x.key === k); return { key: k, label: c.label, type: c.type }; });
+    outRows = rows.map((r) => selKeys.map((k) => r[k]));
+  }
+  if (q.sort && q.sort.field) {
+    const ci = outCols.findIndex((c) => c.key === q.sort.field);
+    if (ci >= 0) { const dir = q.sort.dir === "desc" ? -1 : 1; outRows.sort((a, b) => cmpVals(a[ci], b[ci]) * dir); }
+  }
+  const total = outRows.length;
+  const limit = Math.min(Math.max(1, Number(q.limit) || 5000), 10000);
+  const truncated = total > limit;
+  if (truncated) outRows = outRows.slice(0, limit);
+  return { dataset: dsKey, datasetLabel: ds.label, columns: outCols, rows: outRows, total, truncated };
+}
+
+// --- Exporters --------------------------------------------------------------
+function reportToCSV(rep) {
+  const esc = (v) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head = rep.columns.map((c) => esc(c.label)).join(",");
+  const body = rep.rows.map((row) => row.map((v, i) => esc(fmtCell(v, rep.columns[i].type))).join(","));
+  return "﻿" + [head].concat(body).join("\r\n");
+}
+function reportToXLSX(rep, title) {
+  if (!XLSX_LIB) throw new Error("Excel export is not available on this server.");
+  const aoa = [rep.columns.map((c) => c.label)];
+  for (const row of rep.rows) {
+    aoa.push(row.map((v, i) => {
+      const t = rep.columns[i].type;
+      if (t === "number") { const n = parseNum(v); return n == null ? "" : n; }
+      return fmtCell(v, t);
+    }));
+  }
+  const ws = XLSX_LIB.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = rep.columns.map((c) => ({ wch: Math.min(45, Math.max(10, c.label.length + 4)) }));
+  const wb = XLSX_LIB.utils.book_new();
+  XLSX_LIB.utils.book_append_sheet(wb, ws, "Report");
+  return XLSX_LIB.write(wb, { type: "buffer", bookType: "xlsx" });
+}
+function reportToPDF(rep, title, subtitle) {
+  if (!PDFDoc) return Promise.reject(new Error("PDF export is not available on this server."));
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDoc({ size: "LETTER", layout: "landscape", margin: 36 });
+      const chunks = []; doc.on("data", (d) => chunks.push(d)); doc.on("end", () => resolve(Buffer.concat(chunks)));
+      const left = 36, right = doc.page.width - 36, usable = right - left;
+      doc.fillColor("#003478").fontSize(16).font("Helvetica-Bold").text(title || "Report", left, 30);
+      doc.fillColor("#4a5568").fontSize(9).font("Helvetica").text(subtitle || "", left, 52);
+      let y = 74;
+      const weights = rep.columns.map((c) => Math.max(c.label.length, 8));
+      const wsum = weights.reduce((a, b) => a + b, 0);
+      let widths = weights.map((w) => Math.max(42, Math.round((w / wsum) * usable)));
+      const wtot = widths.reduce((a, b) => a + b, 0);
+      widths = widths.map((w) => Math.floor(w * usable / wtot));
+      const rowH = 16, headH = 18;
+      const drawHeader = () => {
+        doc.rect(left, y, usable, headH).fill("#003478");
+        doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold");
+        let x = left;
+        rep.columns.forEach((c, i) => { doc.text(String(c.label), x + 3, y + 5, { width: widths[i] - 6, height: headH, ellipsis: true, lineBreak: false }); x += widths[i]; });
+        y += headH;
+      };
+      drawHeader();
+      doc.font("Helvetica").fontSize(8);
+      rep.rows.forEach((row, ri) => {
+        if (y + rowH > doc.page.height - 30) { doc.addPage(); y = 40; drawHeader(); doc.font("Helvetica").fontSize(8); }
+        if (ri % 2 === 1) { doc.rect(left, y, usable, rowH).fill("#f2f5fa"); }
+        doc.fillColor("#0e1726");
+        let x = left;
+        row.forEach((v, i) => { doc.text(fmtCell(v, rep.columns[i].type), x + 3, y + 4, { width: widths[i] - 6, height: rowH, ellipsis: true, lineBreak: false }); x += widths[i]; });
+        y += rowH;
+      });
+      doc.fillColor("#8a94a6").fontSize(7).text((rep.truncated ? "Showing first " + rep.rows.length + " of " + rep.total + " rows. " : "Total rows: " + rep.total + ". ") + "Generated by ClaimProof.", left, doc.page.height - 26);
+      doc.end();
+    } catch (e) { reject(e); }
+  });
+}
+
+function reportFilename(rep, ext) {
+  const day = new Date().toISOString().slice(0, 10);
+  return "report-" + rep.dataset + "-" + day + "." + ext;
+}
+
+app.get("/reports", (_req, res) => { res.sendFile(path.join(__dirname, "public", "reports.html")); });
+
+app.get("/api/reports/meta", (req, res) => {
+  const isOwner = req.ctx.user.role === "owner";
+  const datasets = {};
+  for (const k of Object.keys(REPORT_DATASETS)) datasets[k] = { label: REPORT_DATASETS[k].label, columns: REPORT_DATASETS[k].columns };
+  res.json({
+    isOwner,
+    stores: isOwner ? STORES.map((s) => ({ id: s.id, name: s.name })) : [],
+    datasets,
+    presets: reportPresets(),
+    excel: !!XLSX_LIB, pdf: !!PDFDoc,
+  });
+});
+
+app.post("/api/reports/run", (req, res) => {
+  try {
+    const q = req.body || {};
+    const scope = reportScope(req, q.storeId);
+    res.json(runReport(q, scope));
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.post("/api/reports/export", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const fmt = String(b.format || "csv").toLowerCase();
+    const scope = reportScope(req, (b.query || {}).storeId);
+    const rep = runReport(b.query || {}, scope);
+    const title = String(b.title || rep.datasetLabel || "Report").slice(0, 120);
+    const sub = "Generated " + new Date().toISOString().slice(0, 16).replace("T", " ") + "  •  " + rep.total + " row(s)";
+    if (fmt === "csv") {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="' + reportFilename(rep, "csv") + '"');
+      return res.send(reportToCSV(rep));
+    }
+    if (fmt === "xlsx" || fmt === "xls" || fmt === "excel") {
+      const buf = reportToXLSX(rep, title);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="' + reportFilename(rep, "xlsx") + '"');
+      return res.send(buf);
+    }
+    if (fmt === "pdf") {
+      const buf = await reportToPDF(rep, title, sub);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", 'attachment; filename="' + reportFilename(rep, "pdf") + '"');
+      return res.send(buf);
+    }
+    res.status(400).json({ error: "Unknown export format." });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // Account page + self-service password change (any signed-in user).
