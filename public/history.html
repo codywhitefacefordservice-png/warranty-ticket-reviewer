@@ -124,6 +124,7 @@
   </details>
 
   <div class="notice" id="fallback">No records matched every word — showing the closest matches (any word), best first.</div>
+  <div id="pinned"></div>
   <div id="list"></div>
   <button id="more">Load more results</button>
 
@@ -233,11 +234,36 @@ async function open(id){
   }
   d.style.display = "block";
 }
+async function deeplink(){
+  const id = new URLSearchParams(location.search).get("open");
+  if (!id) return;
+  try {
+    const r = await fetch("/api/history/" + encodeURIComponent(id));
+    if (!r.ok) return;
+    const { record } = await r.json();
+    const badge = record.type === "appeal"
+      ? '<span class="badge b-appeal">APPEAL</span>'
+      : (record.score != null ? '<span class="badge b-' + esc(record.verdict) + '">' + record.score + "/100 " + esc(String(record.verdict || "").replace("_", " ")) + "</span>" : "");
+    const card = document.createElement("div");
+    card.className = "card"; card.dataset.id = id; card.dataset.wired = "1";
+    card.innerHTML = '<div class="row"><span class="ro">' + (record.ro ? "RO# " + esc(record.ro) : "(no RO#)") + "</span>"
+      + (record.vehicle ? '<span class="sub2">' + esc(record.vehicle) + "</span>" : "")
+      + (record.vin ? '<span class="sub2">' + esc(record.vin) + "</span>" : "")
+      + badge + '<span class="when">' + when(record.ts) + '</span></div>'
+      + '<div class="snip">' + esc(record.summary || "") + '</div><div class="detail" id="d-' + id + '"></div>';
+    card.addEventListener("click", () => open(id));
+    $("pinned").innerHTML = '<div class="page-sub" style="margin:8px 0 6px">Opened from a report — original submission &amp; documents:</div>';
+    $("pinned").appendChild(card);
+    await open(id);
+    card.scrollIntoView({ block: "start" });
+  } catch (e) {}
+}
 $("go").addEventListener("click", () => load(false));
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") load(false); });
 $("more").addEventListener("click", () => load(true));
 ["fcat","fband","ftype","fverdict","fdays"].forEach(id => $(id).addEventListener("change", () => load(false)));
 load(false);
+deeplink();
 </script>
 <script src="/appbrand.js"></script>
 </body>
