@@ -1293,6 +1293,85 @@ async function callStoryAPI(input, system, useSearch, withTemp = true) {
   return data;
 }
 
+// --- Second-pass refiner (ChatGPT / OpenAI) --------------------------------
+// Story is a two-model pipeline: Claude drafts (with live web search + sources),
+// then ChatGPT refines the writing AND fact-checks it. The refiner is OPTIONAL:
+// if OPENAI_API_KEY is unset or the call fails for any reason, we return Claude's
+// draft unchanged so Story never breaks.
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_STORY_MODEL = process.env.OPENAI_STORY_MODEL || "gpt-4o";
+
+async function callOpenAI(system, user) {
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer " + OPENAI_API_KEY },
+    body: JSON.stringify({
+      model: OPENAI_STORY_MODEL,
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+    }),
+  });
+  const data = await r.json();
+  if (!r.ok) {
+    const msg = (data && data.error && data.error.message) || "OpenAI error " + r.status;
+    const e = new Error(msg); e.status = r.status; throw e;
+  }
+  const txt = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+  return JSON.parse(txt);
+}
+
+function openaiRefineSystem(opts) {
+  opts = opts || {};
+  let s = `You are a meticulous automotive service-writing EDITOR and FACT-CHECKER at a dealership. You receive (1) a technician's ORIGINAL notes for a CUSTOMER-PAY repair and (2) a DRAFT write-up produced from those notes by another writer. Improve ONLY the writing quality — clarity, professional tone, concision, grammar — WITHOUT changing the technical meaning and WITHOUT adding any new facts.
+
+Return ONLY a JSON object (no markdown fences, no commentary) in exactly this shape:
+{
+  "complaint": "the customer's concern, cleaned up",
+  "cause": "what was found/diagnosed, professional and specific but readable",
+  "correction": "what was done to correct it",
+  "customer": "a short, friendly, plain-English explanation for the customer (2-4 sentences, no jargon or part numbers)",
+  "tips": ["OPTIONAL 1-3 short suggestions to strengthen the write-up; empty array if none"]
+}
+
+Hard rules:
+- You are a checker, NOT an author. Do NOT introduce any measurement, reading, test value, part number, or numeric specification that is not already present in the draft.
+- Preserve the CUSTOMER-PAY framing: never add warranty, claim, causal-part, condition-code, labor-operation, or manufacturer-approval language.
+- Keep "customer" plain-English and friendly, with no jargon or part numbers.`;
+  if (opts.readings) {
+    s += `
+- The draft may contain confirm markers like "[CONFIRM: 11.9 V]". Keep every such marker EXACTLY as written — do not remove the brackets, change the number, or present a suggested value as an actual measurement.`;
+  } else {
+    s += `
+- FACT-CHECK (the writer chose a plain write-up with NO invented numbers): if the draft contains ANY measurement, reading, or numeric specification that does not appear in the technician's ORIGINAL notes, REMOVE that number and rewrite the sentence qualitatively (e.g. "measured below specification"). The final text must contain no numbers the technician did not provide.`;
+  }
+  return s;
+}
+
+// Refine a Claude draft with ChatGPT. Keeps the draft's readings and sources
+// (the refiner never invents numbers or citations); only the prose is improved.
+async function refineStory(draft, input, opts) {
+  if (!OPENAI_API_KEY || MOCK) return draft;
+  try {
+    const user = "TECHNICIAN'S ORIGINAL NOTES:\n" + input + "\n\nDRAFT TO REFINE (JSON):\n"
+      + JSON.stringify({ complaint: draft.complaint, cause: draft.cause, correction: draft.correction, customer: draft.customer, tips: draft.tips });
+    const o = await callOpenAI(openaiRefineSystem(opts), user);
+    return {
+      complaint: String(o.complaint || draft.complaint),
+      cause: String(o.cause || draft.cause),
+      correction: String(o.correction || draft.correction),
+      customer: String(o.customer || draft.customer),
+      readings: draft.readings,
+      tips: Array.isArray(o.tips) ? o.tips.slice(0, 3).map(String) : draft.tips,
+      sources: draft.sources,
+      refined: true,
+    };
+  } catch (e) {
+    try { console.error("Story refine (OpenAI) failed, using Claude draft:", e && e.message); } catch (_) {}
+    return draft;
+  }
+}
+
 async function storyWrite(input, opts) {
   opts = opts || {};
   if (MOCK) {
@@ -1310,20 +1389,25 @@ async function storyWrite(input, opts) {
   }
 
   const system = storySystem(opts);
-  // If the writer enabled web lookup, try it first (best-effort). If the search
-  // response errors or doesn't parse as clean JSON, fall back to a no-tool call.
+  // Step 1 — Claude drafts. If the writer enabled web lookup, try it first
+  // (best-effort). If the search response errors or doesn't parse as clean JSON,
+  // fall back to a no-tool call.
+  let draft = null;
   if (opts.search) {
     try {
       const data = await callStoryAPI(input, system, true);
-      const o = parseStoryJSON(data.content);
-      return normalizeStory(o, collectStorySources(data.content));
+      draft = normalizeStory(parseStoryJSON(data.content), collectStorySources(data.content));
     } catch (e) {
       try { console.log("STORY search attempt failed (" + (e && e.message) + "); falling back to no-search call"); } catch (_) {}
     }
   }
-  const data = await callStoryAPI(input, system, false);
-  const o = parseStoryJSON(data.content);
-  return normalizeStory(o, []);
+  if (!draft) {
+    const data = await callStoryAPI(input, system, false);
+    draft = normalizeStory(parseStoryJSON(data.content), []);
+  }
+  // Step 2 — ChatGPT refines & fact-checks (optional; returns the draft as-is if
+  // OPENAI_API_KEY is unset or the refine call fails).
+  return await refineStory(draft, input, opts);
 }
 
 // ---------------------------------------------------------------------------
