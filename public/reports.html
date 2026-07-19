@@ -71,6 +71,8 @@
   tr:nth-child(even) td{background:rgba(16,23,38,.02)}
   @media (prefers-color-scheme: dark){ tr:nth-child(even) td{background:rgba(255,255,255,.03)} }
   .num{text-align:right;font-variant-numeric:tabular-nums}
+  .rolink{color:var(--brand-2);text-decoration:none;font-weight:700} .rolink:hover{text-decoration:underline}
+  .rolinkhint{font-size:12px;color:var(--muted);margin:0 0 10px;display:none}
   .error{display:none;color:var(--red);background:rgba(200,16,46,.08);border:1px solid rgba(200,16,46,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px}
   .empty{color:var(--muted);padding:26px 0;text-align:center}
   .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
@@ -159,6 +161,7 @@
         <button class="sm" id="pdf" type="button">Export PDF</button>
       </div>
     </div>
+    <div class="rolinkhint" id="rolinkHint">Tip: click any <b>RO #</b> to open its original submission and uploaded documents.</div>
     <div class="tablewrap"><table id="rtable"><thead></thead><tbody></tbody></table></div>
   </div>
 
@@ -276,7 +279,10 @@ function renderTable(d){
   thead.innerHTML="<tr>"+d.columns.map(c=>"<th>"+esc(c.label)+"</th>").join("")+"</tr>";
   if(!d.rows.length){ tbody.innerHTML='<tr><td colspan="'+d.columns.length+'"><div class="empty">No rows match.</div></td></tr>'; }
   else {
-    tbody.innerHTML=d.rows.map(row=>"<tr>"+row.map((v,i)=>{ const t=d.columns[i].type; const val=(v==null||v==="")?"":(t==="date"?String(v).slice(0,10):v); return '<td class="'+(t==="number"?"num":"")+'" title="'+esc(val)+'">'+esc(val)+"</td>"; }).join("")+"</tr>").join("");
+    const roIdx=d.columns.findIndex(c=>c.key==="ro");
+    const hasLinks=Array.isArray(d.rowIds);
+    tbody.innerHTML=d.rows.map((row,ri)=>"<tr>"+row.map((v,i)=>{ const t=d.columns[i].type; const val=(v==null||v==="")?"":(t==="date"?String(v).slice(0,10):v); let inner=esc(val); if(i===roIdx && hasLinks && d.rowIds[ri] && val!==""){ inner='<a class="rolink" href="/history?open='+encodeURIComponent(d.rowIds[ri])+'" target="_blank" rel="noopener" title="Open the original submission and its uploaded documents">'+esc(val)+"</a>"; } return '<td class="'+(t==="number"?"num":"")+'" title="'+esc(val)+'">'+inner+"</td>"; }).join("")+"</tr>").join("");
+    $("rolinkHint").style.display=(hasLinks && roIdx>-1)?"block":"none";
   }
   $("results").style.display="block";
   $("results").scrollIntoView({behavior:"smooth",block:"nearest"});
