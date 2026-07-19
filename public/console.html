@@ -173,7 +173,7 @@ function render(){
     const rows = us.map(u=>`<tr>
         <td>${esc(u.name||"—")}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td>
         <td><span class="pill ${u.active?'on':'off'}">${u.active?'active':'off'}</span></td>
-        <td style="text-align:right">${u.role==='owner'?'':`<button class="mini" data-uact="${u.id}" data-to="${u.active?0:1}">${u.active?'Deactivate':'Activate'}</button>`}</td>
+        <td style="text-align:right">${u.mfa?`<button class="mini" data-mfareset="${u.id}" data-name="${esc(u.name||u.email)}" title="Clears this user's authenticator so they re-enroll at next sign-in">Reset MFA</button> `:''}${u.role==='owner'?'':`<button class="mini" data-uact="${u.id}" data-to="${u.active?0:1}">${u.active?'Deactivate':'Activate'}</button>`}</td>
       </tr>`).join("") || `<tr><td colspan="5" class="hint">No users yet.</td></tr>`;
     return `<div class="store">
       <div class="store-head">
@@ -233,6 +233,12 @@ function wire(){
   });
   document.querySelectorAll("[data-uact]").forEach(b=>b.onclick=async()=>{
     await fetch(`/api/owner/users/${b.dataset.uact}/active`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({active:b.dataset.to==="1"})}); load();
+  });
+  document.querySelectorAll("[data-mfareset]").forEach(b=>b.onclick=async()=>{
+    if(!confirm(`Reset two-factor for ${b.dataset.name}?\n\nTheir current authenticator app and backup codes will stop working. They'll set up a fresh one the next time they sign in.`)) return;
+    b.disabled=true;
+    const r=await fetch(`/api/owner/users/${b.dataset.mfareset}/reset-mfa`,{method:"POST",headers:{"content-type":"application/json"}});
+    if(r.ok){ load(); } else { b.disabled=false; alert("Couldn't reset MFA — try again."); }
   });
   document.querySelectorAll("[data-feat]").forEach(b=>b.onclick=async()=>{
     const body={}; body[b.dataset.feat]=(b.dataset.to==="1");
