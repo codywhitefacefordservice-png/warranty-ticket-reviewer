@@ -565,6 +565,77 @@ function logStoryUsage(rec) {
   saveStoryUsage();
 }
 
+// --- Support inbox: help requests are saved server-side (no email needed) and
+// shown to the owner in the console, tagged with the store and user. ----------
+const SUPPORT_FILE = path.join(HISTORY_DIR, "support.json");
+let SUPPORT = [];
+try {
+  if (fs.existsSync(SUPPORT_FILE)) SUPPORT = JSON.parse(fs.readFileSync(SUPPORT_FILE, "utf8"));
+} catch (e) { console.error("Support inbox load failed:", e.message); }
+function saveSupport() {
+  try {
+    if (SUPPORT.length > 3000) SUPPORT = SUPPORT.slice(0, 3000);
+    const tmp = SUPPORT_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(SUPPORT, null, 2));
+    fs.renameSync(tmp, SUPPORT_FILE);
+  } catch (e) { console.error("Support inbox save failed:", e.message); }
+}
+function addSupport(rec) { SUPPORT.unshift(rec); saveSupport(); }
+
+// --- Live status: the app plus the upstream AI providers it depends on. We read
+// Anthropic's and OpenAI's official status feeds (standard Statuspage format) so
+// an outage on their side shows up automatically. Cached 60s; any unreachable
+// feed degrades to "unknown" rather than breaking the page. ---------------------
+const STATUS_FEEDS = {
+  render: "https://status.render.com/api/v2/status.json",
+  anthropic: "https://status.anthropic.com/api/v2/status.json",
+  openai: "https://status.openai.com/api/v2/status.json",
+};
+let STATUS_CACHE = { at: 0, data: null };
+async function fetchProviderStatus(url) {
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 5000);
+    const r = await fetch(url, {
+      headers: { "User-Agent": "ClaimProof-StatusCheck/1.0", accept: "application/json" },
+      signal: ctl.signal,
+    });
+    clearTimeout(timer);
+    if (!r.ok) return { level: "unknown", note: "Status feed returned HTTP " + r.status };
+    const d = await r.json();
+    const ind = String((d && d.status && d.status.indicator) || "none").toLowerCase();
+    const desc = (d && d.status && d.status.description) || "";
+    const level = ind === "none" ? "operational"
+      : ind === "minor" ? "degraded"
+      : ind === "maintenance" ? "maintenance"
+      : "outage"; // major / critical
+    return { level, note: desc || (level === "operational" ? "All systems operational" : "") };
+  } catch (e) {
+    return { level: "unknown", note: "Couldn't reach the status feed just now." };
+  }
+}
+async function getSystemStatus() {
+  if (STATUS_CACHE.data && Date.now() - STATUS_CACHE.at < 60000) return STATUS_CACHE.data;
+  const [render, anthropic, openai] = await Promise.all([
+    fetchProviderStatus(STATUS_FEEDS.render),
+    fetchProviderStatus(STATUS_FEEDS.anthropic),
+    fetchProviderStatus(STATUS_FEEDS.openai),
+  ]);
+  const components = [
+    { key: "app", name: "ClaimProof application", detail: "The website and your reviews, history, and reports.", level: "operational", note: "You're connected, so the app is online." },
+    { key: "render", name: "Hosting & servers (Render)", detail: "The platform the app runs on.", level: render.level, note: render.note },
+    { key: "anthropic", name: "Claude AI", detail: "Powers warranty reviews, appeals, and Repair Story drafting.", level: anthropic.level, note: anthropic.note },
+    { key: "openai", name: "ChatGPT", detail: "Second-pass fact-check on Repair Stories (optional).", level: openai.level, note: openai.note },
+  ];
+  const worst = components.reduce((w, c) => {
+    const rank = { operational: 0, maintenance: 1, degraded: 2, unknown: 2, outage: 3 };
+    return (rank[c.level] || 0) > (rank[w] || 0) ? c.level : w;
+  }, "operational");
+  const data = { checkedAt: new Date().toISOString(), overall: worst, components };
+  STATUS_CACHE = { at: Date.now(), data };
+  return data;
+}
+
 const EXT_BY_TYPE = {
   "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
   "image/webp": ".webp", "application/pdf": ".pdf",
@@ -1523,6 +1594,12 @@ const APPBRAND_JS = `(function(){
           var sy=document.createElement("a"); sy.href="/story"; sy.textContent="Story"; sy.setAttribute("data-story","1"); if(location.pathname==="/story") sy.className="active";
           if(ref) nav.insertBefore(sy, ref.nextSibling||null); else nav.insertBefore(sy, nav.firstChild);
         }
+        if(!nav.querySelector("[data-status]")){
+          var lo=nav.querySelector('a[href="/logout"]');
+          var stt=document.createElement("a"); stt.href="/status"; stt.textContent="Status"; stt.setAttribute("data-status","1"); if(location.pathname==="/status") stt.className="active";
+          var hlp=document.createElement("a"); hlp.href="/support"; hlp.textContent="Help"; hlp.setAttribute("data-help","1"); if(location.pathname==="/support") hlp.className="active";
+          if(lo){ nav.insertBefore(stt,lo); nav.insertBefore(hlp,lo); } else { nav.appendChild(stt); nav.appendChild(hlp); }
+        }
         if(!nav.querySelector("[data-acct]")){
           var so=nav.querySelector('a[href="/logout"]');
           if(d.user && d.user.role==="owner"){ var con=document.createElement("a"); con.href="/console"; con.textContent="Console"; con.setAttribute("data-con","1"); if(so)nav.insertBefore(con,so); else nav.appendChild(con); }
@@ -1575,7 +1652,7 @@ app.put("/resources/upload/:key", express.raw({ type: ["application/pdf", "appli
 app.use((req, res, next) => {
   const ctx = sessionCtx(req);
   if (ctx) { req.ctx = ctx; return next(); }
-  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history" || req.path === "/resources" || req.path === "/reports" || req.path === "/console" || req.path === "/account" || req.path === "/story") && req.method === "GET") {
+  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history" || req.path === "/resources" || req.path === "/reports" || req.path === "/console" || req.path === "/account" || req.path === "/story" || req.path === "/status" || req.path === "/support") && req.method === "GET") {
     return res.send(LOGIN_PAGE.replace("<!--MSG-->", ""));
   }
   return res.status(401).json({ error: "not logged in" });
@@ -1711,6 +1788,39 @@ app.post("/api/owner/stores/:id/rules", requireOwner, (req, res) => {
 
 app.get("/resources", (_req, res) => res.sendFile(path.join(__dirname, "public", "resources.html")));
 app.get("/api/resources", (_req, res) => res.json({ resources: resourceMeta() }));
+
+// --- Status page (available to every logged-in user, any tier) --------------
+app.get("/status", (_req, res) => res.sendFile(path.join(__dirname, "public", "status.html")));
+app.get("/api/status", async (_req, res) => {
+  try { res.json(await getSystemStatus()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- Support inbox (any logged-in user submits; owner reads in the console) --
+app.get("/support", (_req, res) => res.sendFile(path.join(__dirname, "public", "support.html")));
+app.post("/api/support", (req, res) => {
+  const b = req.body || {};
+  const subject = String(b.subject || "").trim().slice(0, 200);
+  const category = String(b.category || "").trim().slice(0, 40);
+  const message = String(b.message || "").trim().slice(0, 5000);
+  if (!message) return res.status(400).json({ error: "Please describe what you need help with." });
+  addSupport({
+    id: genId("sup_"), ts: new Date().toISOString(), status: "open",
+    storeId: req.ctx.store.id, storeName: req.ctx.store.name || req.ctx.store.id,
+    userId: req.ctx.user.id, userName: req.ctx.user.name || req.ctx.user.email, userEmail: req.ctx.user.email,
+    category, subject, message,
+  });
+  res.json({ ok: true });
+});
+app.get("/api/support", requireOwner, (_req, res) => res.json({ items: SUPPORT }));
+app.post("/api/support/:id/status", requireOwner, (req, res) => {
+  const rec = SUPPORT.find((x) => x.id === req.params.id);
+  if (!rec) return res.status(404).json({ error: "Not found." });
+  rec.status = (req.body && req.body.status === "open") ? "open" : "resolved";
+  rec.resolvedAt = rec.status === "resolved" ? new Date().toISOString() : null;
+  saveSupport();
+  res.json({ ok: true, status: rec.status });
+});
 app.get("/resources/file/:key", (req, res) => {
   const r = RESOURCE_BY_KEY[req.params.key];
   if (!r) return res.status(404).send("Not found");
