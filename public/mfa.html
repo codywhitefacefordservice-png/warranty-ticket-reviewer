@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Security check — ClaimProof</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#12294d; --brand-2:#2f80ed; --accent:#2f80ed;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --border:#d7dee8; --bad:#c8102e; --good:#0a8a3a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#2b527f; --brand-2:#5b8def;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --border:#2b3442; --bad:#ef5a6f; --good:#38c172; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--page);
+       font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+        width:min(94vw,440px);box-shadow:0 8px 30px rgba(16,23,38,.10);overflow:hidden}
+  .cap{background:#ffffff;padding:22px 32px 16px;text-align:center;border-bottom:1px solid var(--border)}
+  .cap svg{width:min(60vw,220px);height:auto;display:inline-block}
+  .body{padding:22px 30px 28px}
+  h1{font-size:17px;margin:0 0 6px;font-weight:800}
+  p{margin:0 0 14px;color:var(--ink-2);font-size:13.5px}
+  ol{margin:0 0 16px;padding-left:20px;color:var(--ink-2);font-size:13.5px}
+  ol li{margin:5px 0}
+  label{display:block;font-size:12px;font-weight:700;color:var(--ink-2);margin:14px 0 5px;text-transform:uppercase;letter-spacing:.04em}
+  input{width:100%;padding:12px 13px;font-size:22px;letter-spacing:.28em;text-align:center;border:1px solid var(--border);border-radius:8px;background:var(--page);color:var(--ink);font-weight:700}
+  input:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  button{margin-top:18px;width:100%;padding:12px;font-size:15px;font-weight:700;border:0;border-radius:8px;background:var(--brand);color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(18,41,77,.30),inset 0 1px 0 rgba(255,255,255,.15);transition:box-shadow .12s ease,transform .05s ease,filter .12s ease}
+  button:hover{filter:brightness(1.15)}
+  button:active{transform:translateY(1px)}
+  button.ghost{background:transparent;color:var(--ink-2);box-shadow:none;font-size:13px;font-weight:700;margin-top:10px;padding:8px}
+  button.ghost:hover{filter:none;color:var(--brand-2)}
+  button:disabled{opacity:.55;cursor:wait}
+  .qrwrap{display:flex;justify-content:center;margin:6px 0 14px}
+  .qrbox{background:#fff;padding:12px;border:1px solid var(--border);border-radius:10px;line-height:0}
+  .qrbox img,.qrbox canvas{display:block;width:180px;height:180px}
+  .key{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;font-weight:700;letter-spacing:.12em;
+       background:var(--page);border:1px dashed var(--border);border-radius:8px;padding:10px 12px;text-align:center;word-break:break-all;color:var(--ink)}
+  .keyhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 5px}
+  .keyhead span{font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em}
+  .keyhead button{width:auto;margin:0;padding:4px 10px;font-size:11px;background:var(--surface);color:var(--brand-2);border:1px solid var(--border);box-shadow:none}
+  .msg{font-size:13.5px;min-height:18px;margin:12px 0 0;text-align:center;color:var(--bad)}
+  .msg.ok{color:var(--good)}
+  .codes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+  .codes div{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:15px;font-weight:700;letter-spacing:.08em;
+             background:var(--page);border:1px solid var(--border);border-radius:7px;padding:9px;text-align:center}
+  .warn{background:rgba(200,16,46,.07);border:1px solid rgba(200,16,46,.3);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--ink-2);margin:6px 0 4px}
+  .hint{font-size:12px;color:var(--ink-2);margin-top:10px;text-align:center}
+  .hint a{color:var(--brand-2);text-decoration:none;cursor:pointer}
+  .center{text-align:center}
+  .spin{color:var(--ink-2);text-align:center;padding:20px 0}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="cap">
+      <svg viewBox="0 0 560 150" role="img" aria-label="ClaimProof">
+        <defs><linearGradient id="cpShield" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f80ed"/><stop offset="1" stop-color="#1b56b0"/></linearGradient></defs>
+        <path d="M62 10 L110 28 L110 76 C110 106 88 126 62 140 C36 126 14 106 14 76 L14 28 Z" fill="#12294d"/>
+        <path d="M62 18 L103 33 L103 75 C103 101 84 118 62 130 C40 118 21 101 21 75 L21 33 Z" fill="url(#cpShield)"/>
+        <rect x="35" y="41" width="42" height="52" rx="5" fill="#ffffff"/>
+        <rect x="42" y="52" width="28" height="5" rx="2.5" fill="#12294d"/>
+        <rect x="42" y="63" width="28" height="5" rx="2.5" fill="#2f80ed"/>
+        <rect x="42" y="74" width="20" height="5" rx="2.5" fill="#12294d"/>
+        <path d="M34 78 L52 96 L96 34" fill="none" stroke="#2f80ed" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="140" y="82" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="62" font-weight="800" letter-spacing="-1"><tspan fill="#12294d">Claim</tspan><tspan fill="#2f80ed">Proof</tspan></text>
+        <rect x="142" y="98" width="404" height="3" rx="1.5" fill="#2f80ed"/>
+        <text x="144" y="126" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="23" font-weight="600" fill="#1c3a5e">Stronger Claims. Fewer chargebacks.</text>
+      </svg>
+    </div>
+    <div class="body" id="body">
+      <div class="spin">Loading…</div>
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  const $ = (id)=>document.getElementById(id);
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  let STATE=null;
+
+  async function boot(){
+    let d;
+    try{ d = await fetch("/api/mfa/state?_="+Date.now()).then(r=>r.json()); }
+    catch(e){ return bounce(); }
+    if(!d || d.expired || d.error){ return bounce(); }
+    STATE=d;
+    if(d.stage==="enroll") renderEnroll(d); else renderVerify(d);
+  }
+  function bounce(){ location.href="/"; }
+
+  function renderVerify(d){
+    $("body").innerHTML =
+      '<h1>Enter your code</h1>'+
+      '<p>Signed in as <b>'+esc(d.email)+'</b>. Open your authenticator app and enter the current 6-digit code for ClaimProof.</p>'+
+      '<label for="code">6-digit code</label>'+
+      '<input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" autofocus>'+
+      '<div class="msg" id="msg"></div>'+
+      '<button id="go">Verify</button>'+
+      '<div class="hint">Lost your phone? <a id="useBackup">Use a backup code</a></div>';
+    wireSubmit();
+    $("useBackup").addEventListener("click",()=>{
+      $("code").placeholder="backup code";
+      $("code").style.letterSpacing=".08em"; $("code").style.fontSize="16px";
+      $("code").maxLength=12; $("code").value=""; $("code").focus();
+      $("msg").textContent="Enter one of your saved backup codes.";
+      $("msg").className="msg";
+    });
+  }
+
+  function renderEnroll(d){
+    $("body").innerHTML =
+      '<h1>Set up your authenticator</h1>'+
+      '<p>For <b>'+esc(d.email)+'</b>. This one-time setup adds a second layer so a password alone can’t get into your account.</p>'+
+      '<ol>'+
+        '<li>Open <b>Microsoft Authenticator</b> (or Google Authenticator, Authy, 1Password).</li>'+
+        '<li>Add an account &rarr; <b>scan the QR code</b> below.</li>'+
+        '<li>Enter the 6-digit code it shows.</li>'+
+      '</ol>'+
+      '<div class="qrwrap"><div class="qrbox" id="qr"></div></div>'+
+      '<div class="keyhead"><span>Can’t scan? Enter this key</span><button id="copyKey">Copy</button></div>'+
+      '<div class="key" id="key">'+esc(d.secret)+'</div>'+
+      '<label for="code">Enter the 6-digit code</label>'+
+      '<input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" autofocus>'+
+      '<div class="msg" id="msg"></div>'+
+      '<button id="go">Confirm &amp; continue</button>';
+    // QR
+    try{
+      new QRCode($("qr"), { text: d.otpauth, width:180, height:180, correctLevel: QRCode.CorrectLevel.M });
+    }catch(e){
+      $("qr").innerHTML='<div style="font-size:12px;color:#8a94a6;padding:20px;width:180px">Use the key below to add it manually.</div>';
+    }
+    $("copyKey").addEventListener("click",()=>{
+      try{ navigator.clipboard.writeText(d.secret); $("copyKey").textContent="Copied"; setTimeout(()=>$("copyKey").textContent="Copy",1500);}catch(e){}
+    });
+    wireSubmit();
+  }
+
+  function wireSubmit(){
+    const go=$("go"), code=$("code"), msg=$("msg");
+    async function submit(){
+      const val=(code.value||"").trim();
+      if(!val){ msg.className="msg"; msg.textContent="Enter the code from your app."; return; }
+      go.disabled=true; msg.className="msg"; msg.textContent="Checking…";
+      let d;
+      try{
+        d = await fetch("/api/mfa/verify",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code:val})}).then(r=>r.json());
+      }catch(e){ go.disabled=false; msg.textContent="Network hiccup — try again."; return; }
+      if(d && d.expired){ msg.textContent="Session timed out. Sending you back to sign in…"; setTimeout(bounce,1200); return; }
+      if(d && d.ok && d.backupCodes){ return showBackup(d.backupCodes); }
+      if(d && d.ok){ msg.className="msg ok"; msg.textContent="Verified. Opening ClaimProof…"; setTimeout(()=>location.href="/",700); return; }
+      go.disabled=false;
+      msg.className="msg"; msg.textContent=(d && d.error) ? d.error : "That didn’t work — try again.";
+      code.select();
+    }
+    go.addEventListener("click",submit);
+    code.addEventListener("keydown",(e)=>{ if(e.key==="Enter") submit(); });
+  }
+
+  function showBackup(codes){
+    $("body").innerHTML =
+      '<h1>Save your backup codes</h1>'+
+      '<p>If you ever lose your phone, each of these one-time codes will get you in. Store them somewhere safe — <b>they won’t be shown again.</b></p>'+
+      '<div class="codes">'+codes.map(c=>'<div>'+esc(c)+'</div>').join("")+'</div>'+
+      '<div class="warn">Each code works once. When you run low, an admin can reset your setup to generate new ones.</div>'+
+      '<button id="copyAll">Copy all codes</button>'+
+      '<button id="done" class="ghost">I’ve saved them — continue</button>'+
+      '<div class="msg ok" id="msg"></div>';
+    $("copyAll").addEventListener("click",()=>{
+      try{ navigator.clipboard.writeText(codes.join("\n")); $("msg").textContent="Copied to clipboard.";}catch(e){}
+    });
+    $("done").addEventListener("click",()=>{ location.href="/"; });
+  }
+
+  boot();
+</script>
+</body>
+</html>
