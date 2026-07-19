@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Reports — Whiteface Ford</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8; --good:#0a8a3a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442; --good:#38c172; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1200px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:1200px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  h2{font-size:13px;margin:0 0 12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--brand)}
+  @media (prefers-color-scheme: dark){ h2{color:var(--brand-2)} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,23,38,.04)}
+  label{display:block;font-size:11px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 5px}
+  select,input{width:100%;padding:9px 11px;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
+  select:focus,input:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .field{min-width:0}
+  .presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .preset{font-size:12.5px;font-weight:700;padding:7px 12px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--brand-2);cursor:pointer;white-space:nowrap}
+  .preset:hover{border-color:var(--brand-2);background:rgba(10,75,179,.06)}
+  button{padding:10px 18px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(16,23,38,.06);transition:border-color .12s,box-shadow .12s,filter .12s}
+  button:hover{border-color:var(--brand-2)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(0,52,120,.30)}
+  button.primary:hover{filter:brightness(1.08)}
+  button.sm{padding:7px 12px;font-size:12.5px}
+  button:disabled{opacity:.5;cursor:not-allowed;filter:none}
+  .rowline{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+  .rowline select,.rowline input{width:auto;flex:1;min-width:120px}
+  .rowline .x{flex:0 0 auto;width:34px;padding:8px 0;text-align:center;color:var(--muted)}
+  .checks{display:flex;flex-wrap:wrap;gap:6px 16px}
+  .chk{display:flex;align-items:center;gap:6px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--ink);font-size:13px;margin:0;cursor:pointer}
+  .chk input{width:15px;height:15px;accent-color:var(--brand);margin:0}
+  .sub{font-size:11.5px;color:var(--muted);margin:2px 0 8px;text-transform:none;letter-spacing:0;font-weight:400}
+  .bar{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .divider{height:1px;background:var(--grid);margin:14px 0}
+  .mut{color:var(--muted);font-size:12px}
+  #results{display:none}
+  .rhead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+  .rtitle{font-size:16px;font-weight:800}
+  .rcount{color:var(--muted);font-size:12.5px}
+  .exports{display:flex;gap:8px;flex-wrap:wrap}
+  .tablewrap{overflow-x:auto;border:1px solid var(--grid);border-radius:8px}
+  table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}
+  th{position:sticky;top:0;background:var(--brand);color:#fff;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;font-weight:800}
+  td{padding:7px 10px;border-bottom:1px solid var(--grid);max-width:340px;overflow:hidden;text-overflow:ellipsis}
+  tr:nth-child(even) td{background:rgba(16,23,38,.02)}
+  @media (prefers-color-scheme: dark){ tr:nth-child(even) td{background:rgba(255,255,255,.03)} }
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .error{display:none;color:var(--red);background:rgba(200,16,46,.08);border:1px solid rgba(200,16,46,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px}
+  .empty{color:var(--muted);padding:26px 0;text-align:center}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  footer{margin-top:22px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" alt="" style="display:none">
+    <span id="wordmark" class="wordmark"><b></b><small></small></span>
+  </a>
+  <nav class="nav">
+    <a href="/">Reviewer</a>
+    <a href="/appeal">Appeals</a>
+    <a href="/history">History</a>
+    <a href="/reports" class="active">Reports</a>
+    <a href="/resources">Resources</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">Reports</div>
+  <div class="page-sub">Build any report over your reviews, appeals, and Repair Story usage — filter it, group it, then export to CSV, Excel, or PDF.</div>
+
+  <div id="err" class="error"></div>
+
+  <div class="card">
+    <h2>Quick reports</h2>
+    <div class="presets" id="presets"></div>
+    <div class="sub">Pick one to load it below — then tweak anything you like.</div>
+  </div>
+
+  <div class="card">
+    <h2>Build your own</h2>
+    <div class="grid">
+      <div class="field"><label for="dataset">Data</label><select id="dataset"></select></div>
+      <div class="field" id="storeField" style="display:none"><label for="store">Store</label><select id="store"></select></div>
+      <div class="field"><label for="from">From date</label><input type="date" id="from"></div>
+      <div class="field"><label for="to">To date</label><input type="date" id="to"></div>
+    </div>
+
+    <div class="divider"></div>
+    <label>Filters <span class="sub" style="display:inline">— optional, narrow the rows</span></label>
+    <div id="filters"></div>
+    <button class="sm" id="addFilter" type="button">+ Add filter</button>
+
+    <div class="divider"></div>
+    <label>Group &amp; summarize <span class="sub" style="display:inline">— tick fields to roll rows up into totals/averages; leave blank for a detailed list</span></label>
+    <div class="checks" id="groupby"></div>
+    <div id="metricsWrap" style="display:none">
+      <div class="sub" style="margin-top:10px">Metrics for each group:</div>
+      <div id="metrics"></div>
+      <button class="sm" id="addMetric" type="button">+ Add metric</button>
+    </div>
+
+    <div class="divider"></div>
+    <label id="colsLabel">Columns to show</label>
+    <div class="checks" id="columns"></div>
+
+    <div class="divider"></div>
+    <div class="grid">
+      <div class="field"><label for="sortField">Sort by</label><select id="sortField"></select></div>
+      <div class="field"><label for="sortDir">Direction</label><select id="sortDir"><option value="asc">Ascending</option><option value="desc">Descending</option></select></div>
+    </div>
+
+    <div class="bar">
+      <button id="run" class="primary" type="button">Run report</button>
+      <button id="reset" type="button">Reset</button>
+      <span class="mut" id="hint"></span>
+    </div>
+  </div>
+
+  <div class="card" id="results">
+    <div class="rhead">
+      <div>
+        <div class="rtitle" id="rtitle">Report</div>
+        <div class="rcount" id="rcount"></div>
+      </div>
+      <div class="exports">
+        <button class="sm" id="csv" type="button">Export CSV</button>
+        <button class="sm" id="xlsx" type="button">Export Excel</button>
+        <button class="sm" id="pdf" type="button">Export PDF</button>
+      </div>
+    </div>
+    <div class="tablewrap"><table id="rtable"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <footer>Reports draw only from data your account can see. Owners see all stores; store users see their own. Numbers you export are a snapshot at export time.</footer>
+</div>
+
+<script>
+const $=(id)=>document.getElementById(id);
+let META=null;
+const OPS=[["contains","contains"],["eq","equals"],["ne","not equals"],["gt","greater than"],["lt","less than"],["gte","≥"],["lte","≤"],["empty","is empty"],["notempty","is not empty"]];
+const FNS=[["count","Count of rows"],["avg","Average of"],["sum","Sum of"],["min","Min of"],["max","Max of"]];
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function cols(){ return (META&&META.datasets[$("dataset").value]||{columns:[]}).columns; }
+function numCols(){ return cols().filter(c=>c.type==="number"); }
+function showErr(m){ const e=$("err"); e.textContent=m; e.style.display="block"; }
+function clearErr(){ $("err").style.display="none"; }
+
+function opt(v,l){ const o=document.createElement("option"); o.value=v; o.textContent=l; return o; }
+
+function buildFilterRow(f){
+  const row=document.createElement("div"); row.className="rowline";
+  const fs=document.createElement("select"); cols().forEach(c=>fs.appendChild(opt(c.key,c.label)));
+  const os=document.createElement("select"); OPS.forEach(o=>os.appendChild(opt(o[0],o[1])));
+  const vi=document.createElement("input"); vi.placeholder="value";
+  const x=document.createElement("button"); x.className="sm"; x.textContent="✕"; x.type="button"; x.onclick=()=>row.remove();
+  row.append(fs,os,vi,x);
+  if(f){ fs.value=f.field||fs.value; os.value=f.op||"contains"; vi.value=f.value||""; }
+  $("filters").appendChild(row);
+}
+function buildMetricRow(m){
+  const row=document.createElement("div"); row.className="rowline";
+  const fn=document.createElement("select"); FNS.forEach(o=>fn.appendChild(opt(o[0],o[1])));
+  const fld=document.createElement("select"); numCols().forEach(c=>fld.appendChild(opt(c.key,c.label)));
+  const x=document.createElement("button"); x.className="sm"; x.textContent="✕"; x.type="button"; x.onclick=()=>row.remove();
+  const sync=()=>{ fld.style.display=fn.value==="count"?"none":""; };
+  fn.onchange=sync;
+  row.append(fn,fld,x);
+  if(m){ fn.value=m.fn||"count"; if(m.field) fld.value=m.field; }
+  sync();
+  $("metrics").appendChild(row);
+}
+function currentGroupBy(){ return [...document.querySelectorAll("#groupby input:checked")].map(c=>c.value); }
+function currentMetrics(){ return [...$("metrics").querySelectorAll(".rowline")].map(r=>{ const s=r.querySelectorAll("select"); const fn=s[0].value; return fn==="count"?{fn:"count"}:{fn,field:s[1].value}; }); }
+function currentColumns(){ return [...document.querySelectorAll("#columns input:checked")].map(c=>c.value); }
+
+function refreshMode(){
+  const grouped=currentGroupBy().length>0;
+  $("metricsWrap").style.display=grouped?"":"none";
+  $("colsLabel").textContent=grouped?"Columns (ignored while grouping)":"Columns to show";
+  $("columns").style.opacity=grouped?".45":"1";
+  if(grouped && !$("metrics").children.length) buildMetricRow({fn:"count"});
+  refreshSort();
+}
+function refreshSort(){
+  const sel=$("sortField"); const prev=sel.value; sel.innerHTML="";
+  sel.appendChild(opt("","(none)"));
+  const grouped=currentGroupBy().length>0;
+  if(grouped){
+    currentGroupBy().forEach(k=>{ const c=cols().find(x=>x.key===k); sel.appendChild(opt(k,c?c.label:k)); });
+    currentMetrics().forEach(m=>{ if(m.fn==="count") sel.appendChild(opt("count","Count")); else sel.appendChild(opt(m.fn+"_"+m.field,m.fn+" "+(cols().find(x=>x.key===m.field)||{}).label)); });
+  } else {
+    (currentColumns().length?currentColumns():cols().map(c=>c.key)).forEach(k=>{ const c=cols().find(x=>x.key===k); sel.appendChild(opt(k,c?c.label:k)); });
+  }
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+}
+
+function buildDatasetFields(){
+  const c=cols();
+  $("groupby").innerHTML=""; $("columns").innerHTML="";
+  c.forEach(col=>{
+    const g=document.createElement("label"); g.className="chk"; g.innerHTML='<input type="checkbox" value="'+col.key+'">'+esc(col.label);
+    g.querySelector("input").onchange=refreshMode; $("groupby").appendChild(g);
+    const cc=document.createElement("label"); cc.className="chk"; cc.innerHTML='<input type="checkbox" value="'+col.key+'" checked>'+esc(col.label);
+    cc.querySelector("input").onchange=refreshSort; $("columns").appendChild(cc);
+  });
+  $("filters").innerHTML=""; $("metrics").innerHTML="";
+  refreshMode();
+}
+
+function getQuery(){
+  const q={ dataset:$("dataset").value };
+  const st=$("store").value; if(META.isOwner && st) q.storeId=st;
+  if($("from").value) q.from=$("from").value;
+  if($("to").value) q.to=$("to").value;
+  const filters=[...$("filters").querySelectorAll(".rowline")].map(r=>{ const s=r.querySelectorAll("select"); const v=r.querySelector("input").value; return {field:s[0].value,op:s[1].value,value:v}; }).filter(f=>f.op==="empty"||f.op==="notempty"||f.value!=="");
+  if(filters.length) q.filters=filters;
+  const gb=currentGroupBy();
+  if(gb.length){ q.groupBy=gb; q.agg=currentMetrics(); }
+  else { const cc=currentColumns(); if(cc.length && cc.length<cols().length) q.columns=cc; }
+  if($("sortField").value) q.sort={field:$("sortField").value,dir:$("sortDir").value};
+  return q;
+}
+
+function titleText(){
+  const dl=(META.datasets[$("dataset").value]||{}).label||"Report";
+  return dl + (currentGroupBy().length?" — summary":"");
+}
+
+async function run(){
+  clearErr();
+  const btn=$("run"); btn.disabled=true; const o=btn.textContent; btn.innerHTML='<span class="spin"></span>Running…';
+  try{
+    const r=await fetch("/api/reports/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(getQuery())});
+    const d=await r.json();
+    if(!r.ok){ showErr(d.error||"Could not run the report."); return; }
+    renderTable(d);
+  }catch(e){ showErr("Network error — try again."); }
+  finally{ btn.disabled=false; btn.textContent=o; }
+}
+
+function renderTable(d){
+  $("rtitle").textContent=titleText();
+  $("rcount").textContent=(d.truncated?("Showing first "+d.rows.length+" of "+d.total+" rows"):(d.total+" row"+(d.total===1?"":"s")));
+  const thead=$("rtable").querySelector("thead"), tbody=$("rtable").querySelector("tbody");
+  thead.innerHTML="<tr>"+d.columns.map(c=>"<th>"+esc(c.label)+"</th>").join("")+"</tr>";
+  if(!d.rows.length){ tbody.innerHTML='<tr><td colspan="'+d.columns.length+'"><div class="empty">No rows match.</div></td></tr>'; }
+  else {
+    tbody.innerHTML=d.rows.map(row=>"<tr>"+row.map((v,i)=>{ const t=d.columns[i].type; const val=(v==null||v==="")?"":(t==="date"?String(v).slice(0,10):v); return '<td class="'+(t==="number"?"num":"")+'" title="'+esc(val)+'">'+esc(val)+"</td>"; }).join("")+"</tr>").join("");
+  }
+  $("results").style.display="block";
+  $("results").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+async function exportReport(fmt){
+  clearErr();
+  const btn=$(fmt); btn.disabled=true; const o=btn.textContent; btn.textContent="…";
+  try{
+    const r=await fetch("/api/reports/export",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({format:fmt,title:titleText(),query:getQuery()})});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); showErr(e.error||"Export failed."); return; }
+    const blob=await r.blob();
+    const cd=r.headers.get("content-disposition")||""; const m=cd.match(/filename="([^"]+)"/);
+    const name=m?m[1]:("report."+fmt);
+    const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+  }catch(e){ showErr("Export failed — try again."); }
+  finally{ btn.disabled=false; btn.textContent=o; }
+}
+
+function setFormFromQuery(q){
+  $("dataset").value=q.dataset||"reviews";
+  buildDatasetFields();
+  $("store").value=q.storeId||"";
+  $("from").value=q.from||""; $("to").value=q.to||"";
+  ($("filters").innerHTML="");
+  (q.filters||[]).forEach(f=>buildFilterRow(f));
+  const gb=new Set(q.groupBy||[]);
+  document.querySelectorAll("#groupby input").forEach(c=>c.checked=gb.has(c.value));
+  $("metrics").innerHTML="";
+  if(gb.size){ (q.agg&&q.agg.length?q.agg:[{fn:"count"}]).forEach(m=>buildMetricRow(m)); }
+  if(q.columns&&q.columns.length){ const set=new Set(q.columns); document.querySelectorAll("#columns input").forEach(c=>c.checked=set.has(c.value)); }
+  else { document.querySelectorAll("#columns input").forEach(c=>c.checked=true); }
+  refreshMode();
+  if(q.sort){ $("sortField").value=q.sort.field||""; $("sortDir").value=q.sort.dir||"asc"; }
+}
+
+function loadPreset(p){ setFormFromQuery(JSON.parse(JSON.stringify(p.query))); run(); }
+
+function init(meta){
+  META=meta;
+  Object.keys(meta.datasets).forEach(k=>$("dataset").appendChild(opt(k,meta.datasets[k].label)));
+  if(meta.isOwner){ $("storeField").style.display=""; $("store").appendChild(opt("","All stores")); meta.stores.forEach(s=>$("store").appendChild(opt(s.id,s.name))); }
+  $("presets").innerHTML=""; meta.presets.forEach(p=>{ const b=document.createElement("button"); b.className="preset"; b.type="button"; b.textContent=p.label; b.onclick=()=>loadPreset(p); $("presets").appendChild(b); });
+  if(!meta.excel){ $("xlsx").disabled=true; $("xlsx").title="Excel export unavailable"; }
+  if(!meta.pdf){ $("pdf").disabled=true; $("pdf").title="PDF export unavailable"; }
+  $("dataset").onchange=buildDatasetFields;
+  $("addFilter").onclick=()=>buildFilterRow();
+  $("addMetric").onclick=()=>buildMetricRow();
+  $("run").onclick=run;
+  $("reset").onclick=()=>{ setFormFromQuery({dataset:$("dataset").value}); $("results").style.display="none"; };
+  $("csv").onclick=()=>exportReport("csv");
+  $("xlsx").onclick=()=>exportReport("xlsx");
+  $("pdf").onclick=()=>exportReport("pdf");
+  buildDatasetFields();
+}
+
+fetch("/api/reports/meta").then(r=>{ if(r.status===401||r.status===403){ location.href="/"; return null; } return r.json(); }).then(m=>{ if(m) init(m); }).catch(()=>showErr("Could not load the report builder."));
+</script>
+<script src="/appbrand.js"></script>
+</body>
+</html>
