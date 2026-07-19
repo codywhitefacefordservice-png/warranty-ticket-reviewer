@@ -1352,11 +1352,11 @@ const APPBRAND_JS = `(function(){
     try{
       var nav=document.querySelector(".nav");
       if(nav){
-        if(!feat.warranty){ ["/","/appeal","/history","/resources","/reports"].forEach(function(h){ var a=nav.querySelector('a[href="'+h+'"]'); if(a) a.style.display="none"; }); }
-        if(feat.warranty && !nav.querySelector("[data-reports]")){
-          var hist=nav.querySelector('a[href="/history"]');
+        if(!feat.warranty){ ["/","/appeal","/history","/resources"].forEach(function(h){ var a=nav.querySelector('a[href="'+h+'"]'); if(a) a.style.display="none"; }); }
+        if((feat.warranty||feat.story) && !nav.querySelector('a[href="/reports"]')){
           var rp=document.createElement("a"); rp.href="/reports"; rp.textContent="Reports"; rp.setAttribute("data-reports","1"); if(location.pathname==="/reports") rp.className="active";
-          if(hist) nav.insertBefore(rp, hist.nextSibling||null); else nav.appendChild(rp);
+          var anchor=nav.querySelector('a[href="/history"]')||nav.querySelector('a[href="/logout"]');
+          if(anchor) nav.insertBefore(rp, anchor.nextSibling||null); else nav.appendChild(rp);
         }
         if(feat.story && !nav.querySelector("[data-story]")){
           var ref=nav.querySelector('a[href="/"]');
@@ -1426,9 +1426,11 @@ app.use((req, res, next) => {
 // hiding nav links is cosmetic; THIS is what stops anyone getting tools free.
 function featureForPath(p) {
   if (p === "/story" || p === "/api/story") return "story";
-  if (p === "/" || p === "/appeal" || p === "/history" || p === "/resources" || p === "/reports") return "warranty";
+  if (p === "/" || p === "/appeal" || p === "/history" || p === "/resources") return "warranty";
   if (p === "/api/review" || p === "/api/appeal" || p === "/api/resources") return "warranty";
-  if (p.indexOf("/api/history") === 0 || p.indexOf("/resources/file") === 0 || p.indexOf("/api/reports") === 0) return "warranty";
+  if (p.indexOf("/api/history") === 0 || p.indexOf("/resources/file") === 0) return "warranty";
+  // /reports and /api/reports are available on every tier; each store's entitlement
+  // to specific datasets is enforced inside the report handlers (allowedDatasets).
   return null; // shared (account, me, owner, logos, etc.) - never gated
 }
 app.use((req, res, next) => {
@@ -2071,17 +2073,33 @@ function reportFilename(rep, ext) {
   return "report-" + rep.dataset + "-" + day + "." + ext;
 }
 
-app.get("/reports", (_req, res) => { res.sendFile(path.join(__dirname, "public", "reports.html")); });
+// Reporting is available on EVERY tier, but a store may only report on the data
+// it pays for: reviews & appeals ride on the warranty tool, stories on the Story
+// tool. This is enforced server-side, so the datasets a store can't see are never
+// exposed in meta and are rejected on run/export.
+function allowedDatasets(store) {
+  const f = storeFeatures(store);
+  const out = [];
+  if (f.warranty) out.push("reviews", "appeals");
+  if (f.story) out.push("stories");
+  return out;
+}
+
+app.get("/reports", (req, res) => {
+  if (!allowedDatasets(req.ctx.store).length) return res.redirect("/account");
+  res.sendFile(path.join(__dirname, "public", "reports.html"));
+});
 
 app.get("/api/reports/meta", (req, res) => {
   const isOwner = req.ctx.user.role === "owner";
+  const allow = allowedDatasets(req.ctx.store);
   const datasets = {};
-  for (const k of Object.keys(REPORT_DATASETS)) datasets[k] = { label: REPORT_DATASETS[k].label, columns: REPORT_DATASETS[k].columns };
+  for (const k of allow) datasets[k] = { label: REPORT_DATASETS[k].label, columns: REPORT_DATASETS[k].columns };
   res.json({
     isOwner,
     stores: isOwner ? STORES.map((s) => ({ id: s.id, name: s.name })) : [],
     datasets,
-    presets: reportPresets(),
+    presets: reportPresets().filter((p) => allow.includes(p.query.dataset)),
     excel: !!XLSX_LIB, pdf: !!PDFDoc,
   });
 });
@@ -2089,6 +2107,7 @@ app.get("/api/reports/meta", (req, res) => {
 app.post("/api/reports/run", (req, res) => {
   try {
     const q = req.body || {};
+    if (!allowedDatasets(req.ctx.store).includes(q.dataset)) return res.status(403).json({ error: "That report isn't included in your plan." });
     const scope = reportScope(req, q.storeId);
     res.json(runReport(q, scope));
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -2098,6 +2117,7 @@ app.post("/api/reports/export", async (req, res) => {
   try {
     const b = req.body || {};
     const fmt = String(b.format || "csv").toLowerCase();
+    if (!allowedDatasets(req.ctx.store).includes((b.query || {}).dataset)) return res.status(403).json({ error: "That report isn't included in your plan." });
     const scope = reportScope(req, (b.query || {}).storeId);
     const rep = runReport(b.query || {}, scope);
     const title = String(b.title || rep.datasetLabel || "Report").slice(0, 120);
