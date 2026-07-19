@@ -24,6 +24,12 @@ const path = require("path");
 let SHARP = null;
 try { SHARP = require("sharp"); }
 catch (e) { console.error("sharp not available - images will be stored uncompressed:", e.message); }
+// Pure-JS HEIC/HEIF decoder. iPhones shoot HEIC by default, and sharp's prebuilt
+// binary cannot decode HEVC-based HEIC. heic-convert bundles libheif as WASM, so
+// it works on any host regardless of system codecs. Loaded lazily/optionally.
+let HEIC_CONVERT = null;
+try { HEIC_CONVERT = require("heic-convert"); }
+catch (e) { console.error("heic-convert not available - HEIC photos can't be converted:", e.message); }
 const IMG_MAX_EDGE = 2000;        // longest side, px
 const IMG_JPEG_QUALITY = 72;      // good enough to read a hard card / spot damage
 const IMG_COMPRESS_THRESHOLD = 1_200_000; // only bother compressing files above ~1.2MB
@@ -44,26 +50,96 @@ async function compressImageBuffer(buf, type) {
   return { buf, type };
 }
 
-// Compress every image in an uploaded-files array (base64 in, base64 out).
-// PDFs and anything non-image pass through untouched.
-async function compressFiles(files) {
-  if (!Array.isArray(files) || !files.length) return files;
+// The image formats the reviewer API can read directly. Anything else has to be
+// converted to one of these (or reported as unreadable) before we send it.
+const API_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+// Detect Apple HEIC/HEIF (what iPhones produce by default). We check the MIME
+// type, the filename, AND the ISO-BMFF magic bytes, because browsers often send
+// HEIC with an empty or wrong type.
+function looksHeic(buf, type, name) {
+  const t = String(type || "").toLowerCase();
+  if (t.includes("heic") || t.includes("heif")) return true;
+  const n = String(name || "").toLowerCase();
+  if (/\.(heic|heif)$/.test(n)) return true;
+  if (buf && buf.length > 12 && buf.toString("ascii", 4, 8) === "ftyp") {
+    const brand = buf.toString("ascii", 8, 12).toLowerCase();
+    if (["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "msf1"].includes(brand)) return true;
+  }
+  return false;
+}
+
+// HEIC/HEIF -> JPEG using the pure-JS decoder. Returns a Buffer or null on failure.
+async function heicToJpeg(buf) {
+  if (!HEIC_CONVERT) return null;
+  try {
+    const out = await HEIC_CONVERT({ buffer: buf, format: "JPEG", quality: 0.9 });
+    const b = Buffer.from(out);
+    return (b && b.length) ? b : null;
+  } catch (e) { console.error("HEIC->JPEG failed:", e.message); return null; }
+}
+
+// Convert any sharp-decodable image (tiff, bmp, avif, etc.) to JPEG. Null on failure.
+async function sharpToJpeg(buf) {
+  if (!SHARP) return null;
+  try {
+    const out = await SHARP(buf, { failOn: "none" })
+      .rotate()
+      .resize({ width: IMG_MAX_EDGE, height: IMG_MAX_EDGE, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: IMG_JPEG_QUALITY, mozjpeg: true })
+      .toBuffer();
+    return (out && out.length) ? out : null;
+  } catch (e) { console.error("Image->JPEG failed:", e.message); return null; }
+}
+
+// Friendly message when we truly can't read an uploaded image, so nothing is ever
+// silently dropped from a review.
+function unreadableMsg(names) {
+  const one = names.length === 1;
+  return "We couldn't read " + (one ? "this photo" : "these photos") + ": " + names.join(", ") +
+    ". Please upload " + (one ? "it" : "them") + " as a JPG, PNG, or PDF. " +
+    "(On iPhone: Settings → Camera → Formats → “Most Compatible,” or just take a screenshot of the photo and upload that.)";
+}
+
+// Prepare an uploaded-files array: convert iPhone HEIC (and other odd image
+// formats) to JPEG so the reviewer can actually read them, then shrink oversized
+// photos. PDFs and non-image attachments pass through untouched. Returns the
+// processed files plus the names of any image we genuinely could not read.
+async function prepareFiles(files) {
+  if (!Array.isArray(files) || !files.length) return { files: files || [], unreadable: [] };
   const out = [];
+  const unreadable = [];
   for (const f of files) {
-    const type = String((f && f.type) || "");
+    let type = String((f && f.type) || "");
+    let name = String((f && f.name) || "photo");
     const data = String((f && f.data) || "");
     if (!data) { out.push(f); continue; }
     let buf;
     try { buf = Buffer.from(data, "base64"); } catch { out.push(f); continue; }
+
+    if (looksHeic(buf, type, name)) {
+      const jpg = await heicToJpeg(buf);
+      if (!jpg) { unreadable.push(name); continue; }
+      buf = jpg; type = "image/jpeg";
+      name = name.replace(/\.(heic|heif)$/i, "") + ".jpg";
+    } else if (type.startsWith("image/") && !API_IMAGE_TYPES.includes(type)) {
+      // An image in a format the reviewer can't read (tiff, bmp, avif, ...).
+      const jpg = await sharpToJpeg(buf);
+      if (!jpg) { unreadable.push(name); continue; }
+      buf = jpg; type = "image/jpeg";
+      name = name.replace(/\.[a-z0-9]+$/i, "") + ".jpg";
+    }
+
     const r = await compressImageBuffer(buf, type);
-    if (r.buf === buf) { out.push(f); }
-    else {
-      let nm = String((f && f.name) || "photo");
+    if (r.buf === buf && r.type === type) {
+      out.push({ name, type, data: buf.toString("base64") });
+    } else {
+      let nm = name;
       if (r.type === "image/jpeg") nm = nm.replace(/\.(png|webp|heic|heif|jpe?g|gif)$/i, "") + ".jpg";
       out.push({ name: nm, type: r.type, data: r.buf.toString("base64") });
     }
   }
-  return out;
+  return { files: out, unreadable };
 }
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -1574,7 +1650,9 @@ app.post("/api/appeal", async (req, res) => {
   const ticket = String(req.body.ticket || "").trim();
   if (!rejection) return res.status(400).json({ error: "Paste the rejection or chargeback notice first." });
   if (rejection.length + ticket.length > 80000) return res.status(400).json({ error: "That's too long — trim it down." });
-  const files = Array.isArray(req.body.files) ? req.body.files : [];
+  const _prep = await prepareFiles(Array.isArray(req.body.files) ? req.body.files : []);
+  if (_prep.unreadable.length) return res.status(400).json({ error: unreadableMsg(_prep.unreadable) });
+  const files = _prep.files;
   try {
     const key = reviewCacheKey("appeal", ticket, files, rejection);
     let appeal;
@@ -1687,7 +1765,9 @@ app.post("/api/review", async (req, res) => {
   // Shrink oversized photos up front so the SAME compressed image is what we
   // send to the API (avoids the API's ~5MB/image limit) and what we retain in
   // History — keeping storage small and the cache key consistent.
-  const files = await compressFiles(Array.isArray(b.files) ? b.files : []);
+  const _prep = await prepareFiles(Array.isArray(b.files) ? b.files : []);
+  if (_prep.unreadable.length) return res.status(400).json({ error: unreadableMsg(_prep.unreadable) });
+  const files = _prep.files;
 
   let ticket, vinField;
   const legacy = String(b.ticket || "").trim();
