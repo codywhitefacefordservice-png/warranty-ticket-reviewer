@@ -82,6 +82,17 @@
   .modal .sub2{color:var(--ink-2);font-size:13px}
   .modal .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
   .modal .danger{background:var(--bad);border-color:var(--bad);color:#fff}
+  #sup-count{font-size:11px;font-weight:800;color:#fff;background:var(--bad,#c8102e);border-radius:999px;padding:2px 8px;margin-left:6px;display:none}
+  .sup-item{border:1px solid var(--border,#d7dee8);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:var(--surface,#fff)}
+  .sup-item.resolved{opacity:.55}
+  .sup-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .sup-cat{font-weight:800;color:var(--brand-2,#0a4bb3);text-transform:uppercase;letter-spacing:.03em;font-size:11px}
+  .sup-when{font-size:12px;color:var(--muted,#8a94a6);margin-left:auto}
+  .sup-subj{font-weight:700;margin:7px 0 3px}
+  .sup-msg{font-size:13.5px;white-space:pre-wrap;line-height:1.5}
+  .sup-who{font-size:12px;color:var(--muted,#8a94a6);margin-top:7px}
+  .sup-who a{color:var(--brand-2,#0a4bb3)}
+  .sup-item .mini{margin-top:9px}
 </style>
 </head>
 <body>
@@ -99,13 +110,18 @@
     <rect x="142" y="98" width="404" height="3" rx="1.5" fill="#2f80ed"/>
     <text x="144" y="126" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="23" font-weight="600" fill="#1c3a5e">Stronger Claims. Fewer chargebacks.</text>
   </svg>
-  <nav class="nav"><a href="/">Reviewer</a><a href="/logout">Sign out</a></nav>
+  <nav class="nav"><a href="/">Reviewer</a><a href="/status">Status</a><a href="/support">Help</a><a href="/logout">Sign out</a></nav>
 </div></div>
 <div class="accent"></div>
 
 <div class="wrap">
   <div class="page-title">Owner Console</div>
   <div class="page-sub">Add dealerships, give each its own logo and advisor logins, and switch access on or off. Each store only ever sees its own claims.</div>
+
+  <div class="card" id="supportcard">
+    <h2>Support inbox <span id="sup-count"></span></h2>
+    <div id="sup-list" class="hint">Loading…</div>
+  </div>
 
   <div class="card">
     <h2>Add a store</h2>
@@ -286,6 +302,39 @@ $("#ns-add").onclick=async()=>{
   else { m.className="msg err"; m.textContent=d.error||"Could not create store."; }
 };
 load();
+
+// --- Support inbox ---
+async function loadSupport(){
+  const wrap=$("#sup-list"), badge=$("#sup-count");
+  try{
+    const r=await fetch("/api/support");
+    if(!r.ok){ wrap.innerHTML="<span class='hint'>Couldn't load support requests.</span>"; return; }
+    const d=await r.json(); const items=d.items||[];
+    const open=items.filter(i=>i.status!=="resolved").length;
+    if(open>0){ badge.style.display="inline-block"; badge.textContent=open+" open"; } else { badge.style.display="none"; }
+    if(!items.length){ wrap.innerHTML="<span class='hint'>No support requests yet. When a store sends one from the Help page, it shows up here.</span>"; return; }
+    wrap.innerHTML=items.map(i=>{
+      const resolved=i.status==="resolved";
+      let when=i.ts; try{ when=new Date(i.ts).toLocaleString(); }catch(e){}
+      return `<div class="sup-item ${resolved?'resolved':''}">
+        <div class="sup-top"><span class="sup-cat">${esc(i.category||'Question')}</span>
+        <span class="pill ${resolved?'off':'on'}">${resolved?'resolved':'open'}</span>
+        <span class="sup-when">${esc(when)}</span></div>
+        ${i.subject?`<div class="sup-subj">${esc(i.subject)}</div>`:''}
+        <div class="sup-msg">${esc(i.message||'')}</div>
+        <div class="sup-who">${esc(i.userName||'')} &middot; ${esc(i.storeName||'')} &middot; <a href="mailto:${esc(i.userEmail||'')}">${esc(i.userEmail||'')}</a></div>
+        <button class="mini" data-sup="${esc(i.id)}" data-to="${resolved?'open':'resolved'}">${resolved?'Reopen':'Mark resolved'}</button>
+      </div>`;
+    }).join("");
+  }catch(e){ wrap.innerHTML="<span class='hint'>Couldn't load support requests.</span>"; }
+}
+document.addEventListener("click", async (e)=>{
+  const b=e.target.closest("[data-sup]"); if(!b) return;
+  b.disabled=true;
+  try{ await fetch("/api/support/"+encodeURIComponent(b.dataset.sup)+"/status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({status:b.dataset.to})}); }catch(_){}
+  loadSupport();
+});
+loadSupport();
 </script>
 </body>
 </html>
