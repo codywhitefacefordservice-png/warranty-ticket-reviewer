@@ -636,6 +636,110 @@ async function getSystemStatus() {
   return data;
 }
 
+// ---------------------------------------------------------------------------
+// Per-store learning. The reviewer remembers the recurring documentation
+// problems it has flagged for each store, feeds a short summary of them into
+// that store's future reviews (so it catches repeats and can point them out),
+// and surfaces them on an Insights page. STRICTLY per store: a store only ever
+// learns from its own history; nothing is pooled or shared across stores.
+// ---------------------------------------------------------------------------
+const STORE_MEMORY_FILE = path.join(HISTORY_DIR, "store_memory.json");
+let STORE_MEMORY = {}; // storeId -> { patterns: [...], updatedAt }
+try {
+  if (fs.existsSync(STORE_MEMORY_FILE)) STORE_MEMORY = JSON.parse(fs.readFileSync(STORE_MEMORY_FILE, "utf8"));
+} catch (e) { console.error("Store memory load failed:", e.message); }
+function saveStoreMemory() {
+  try {
+    const tmp = STORE_MEMORY_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(STORE_MEMORY));
+    fs.renameSync(tmp, STORE_MEMORY_FILE);
+  } catch (e) { console.error("Store memory save failed:", e.message); }
+}
+const SEV_RANK = { warning: 1, serious: 2, critical: 3 };
+// Normalize a free-text flag/item into a grouping key so the same recurring
+// problem lands in the same bucket even when the wording varies slightly.
+function normKey(s) {
+  return String(s || "").toLowerCase()
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/[0-9]+/g, "#")
+    .replace(/[^a-z#]+/g, " ")
+    .trim().replace(/\s+/g, " ").slice(0, 80);
+}
+// Pull the recurring-issue signals out of one review's result.
+function extractIssues(result) {
+  const out = [];
+  if (!result || typeof result !== "object") return out;
+  for (const c of (Array.isArray(result.completeness) ? result.completeness : [])) {
+    const status = String((c && c.status) || "").toLowerCase();
+    if (status !== "missing" && status !== "unclear") continue;
+    const item = String((c && c.item) || "").trim();
+    if (!item) continue;
+    out.push({
+      key: "missing:" + normKey(item),
+      label: item + (status === "unclear" ? " — documented unclearly" : " — missing or blank"),
+      severity: status === "missing" ? "serious" : "warning", kind: "completeness",
+    });
+  }
+  for (const r of (Array.isArray(result.risks) ? result.risks : [])) {
+    const flag = String((r && r.flag) || "").trim();
+    if (!flag) continue;
+    out.push({ key: "risk:" + normKey(flag), label: flag, severity: String((r && r.severity) || "warning").toLowerCase(), kind: "risk" });
+  }
+  return out;
+}
+// Merge one review's issues into a store's memory (no save; caller saves).
+function applyIssues(storeId, result, ts) {
+  const issues = extractIssues(result);
+  if (!storeId || !issues.length) return;
+  const mem = STORE_MEMORY[storeId] || (STORE_MEMORY[storeId] = { patterns: [], updatedAt: null });
+  const now = ts || new Date().toISOString();
+  for (const is of issues) {
+    let p = mem.patterns.find((x) => x.key === is.key);
+    if (!p) { p = { key: is.key, label: is.label, kind: is.kind, severity: is.severity, count: 0, firstTs: now, lastTs: now, status: "active", confirms: 0 }; mem.patterns.push(p); }
+    p.count += 1;
+    if (String(now) > String(p.lastTs || "")) p.lastTs = now;
+    if ((SEV_RANK[is.severity] || 0) > (SEV_RANK[p.severity] || 0)) p.severity = is.severity;
+    if (is.kind === "risk" && is.label && is.label.length > (p.label || "").length) p.label = is.label;
+  }
+  mem.updatedAt = now;
+}
+function learnFromReview(storeId, result, ts) {
+  try { applyIssues(storeId, result, ts); saveStoreMemory(); } catch (e) { console.error("learnFromReview failed:", e.message); }
+}
+// Count of review records a store has (so Insights can say "learned from N").
+function storeReviewCount(storeId) {
+  let n = 0;
+  for (const r of HISTORY) if (r && r.type === "review" && r.storeId === storeId) n++;
+  return n;
+}
+// The prompt snippet injected into a store's reviews. Only patterns that have
+// actually recurred (count>=2) and are not muted; ranked, capped at 8.
+function storeMemoryPromptSnippet(storeId) {
+  const mem = STORE_MEMORY[storeId];
+  if (!mem || !Array.isArray(mem.patterns)) return "";
+  const top = mem.patterns
+    .filter((p) => p.status !== "muted" && p.count >= 2)
+    .sort((a, b) => (b.count - a.count) || String(b.lastTs || "").localeCompare(String(a.lastTs || "")))
+    .slice(0, 8);
+  if (!top.length) return "";
+  const lines = top.map((p) => "- " + p.label + " (flagged " + p.count + "× in this store's past tickets)").join("\n");
+  return "\n\nTHIS STORE'S RECURRING DOCUMENTATION ISSUES (learned from ITS OWN past reviews). Use this ONLY to check the current ticket more carefully — do NOT invent facts from it, and do NOT flag an item unless it genuinely applies to THIS ticket. For any item below that DOES apply here, call it out as you normally would and, where natural, note in the \"detail\" that it is a recurring issue for this store so the advisor can build the habit of fixing it. If an item does not apply to this ticket, ignore it silently.\n" + lines;
+}
+// Seed every store's memory from the full review history — used the first time
+// so the feature works from day one on existing data.
+function rebuildStoreMemory() {
+  STORE_MEMORY = {};
+  const revs = HISTORY.filter((r) => r && r.type === "review" && r.storeId && r.result);
+  revs.sort((a, b) => String(a.ts || "").localeCompare(String(b.ts || "")));
+  for (const r of revs) applyIssues(r.storeId, r.result, r.ts);
+  saveStoreMemory();
+  return revs.length;
+}
+if (!fs.existsSync(STORE_MEMORY_FILE)) {
+  try { const n = rebuildStoreMemory(); console.log("Store memory seeded from " + n + " past review(s)."); }
+  catch (e) { console.error("Store memory seed failed:", e.message); }
+}
+
 const EXT_BY_TYPE = {
   "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
   "image/webp": ".webp", "application/pdf": ".pdf",
@@ -1589,6 +1693,11 @@ const APPBRAND_JS = `(function(){
           var anchor=nav.querySelector('a[href="/history"]')||nav.querySelector('a[href="/logout"]');
           if(anchor) nav.insertBefore(rp, anchor.nextSibling||null); else nav.appendChild(rp);
         }
+        if(feat.warranty && !nav.querySelector('a[href="/insights"]')){
+          var ins=document.createElement("a"); ins.href="/insights"; ins.textContent="Insights"; ins.setAttribute("data-insights","1"); if(location.pathname==="/insights") ins.className="active";
+          var ianchor=nav.querySelector('a[href="/history"]')||nav.querySelector('a[href="/reports"]')||nav.querySelector('a[href="/logout"]');
+          if(ianchor) nav.insertBefore(ins, ianchor.nextSibling||null); else nav.appendChild(ins);
+        }
         if(feat.story && !nav.querySelector("[data-story]")){
           var ref=nav.querySelector('a[href="/"]');
           var sy=document.createElement("a"); sy.href="/story"; sy.textContent="Story"; sy.setAttribute("data-story","1"); if(location.pathname==="/story") sy.className="active";
@@ -1652,7 +1761,7 @@ app.put("/resources/upload/:key", express.raw({ type: ["application/pdf", "appli
 app.use((req, res, next) => {
   const ctx = sessionCtx(req);
   if (ctx) { req.ctx = ctx; return next(); }
-  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history" || req.path === "/resources" || req.path === "/reports" || req.path === "/console" || req.path === "/account" || req.path === "/story" || req.path === "/status" || req.path === "/support") && req.method === "GET") {
+  if ((req.path === "/" || req.path === "/appeal" || req.path === "/history" || req.path === "/resources" || req.path === "/reports" || req.path === "/console" || req.path === "/account" || req.path === "/story" || req.path === "/status" || req.path === "/support" || req.path === "/insights") && req.method === "GET") {
     return res.send(LOGIN_PAGE.replace("<!--MSG-->", ""));
   }
   return res.status(401).json({ error: "not logged in" });
@@ -1664,6 +1773,7 @@ app.use((req, res, next) => {
 function featureForPath(p) {
   if (p === "/story" || p === "/api/story") return "story";
   if (p === "/" || p === "/appeal" || p === "/history" || p === "/resources") return "warranty";
+  if (p === "/insights" || p.indexOf("/api/insights") === 0) return "warranty";
   if (p === "/api/review" || p === "/api/appeal" || p === "/api/resources") return "warranty";
   if (p.indexOf("/api/history") === 0 || p.indexOf("/resources/file") === 0) return "warranty";
   // /reports and /api/reports are available on every tier; each store's entitlement
@@ -1820,6 +1930,40 @@ app.post("/api/support/:id/status", requireOwner, (req, res) => {
   rec.resolvedAt = rec.status === "resolved" ? new Date().toISOString() : null;
   saveSupport();
   res.json({ ok: true, status: rec.status });
+});
+
+// --- Per-store learning insights (warranty tier; strictly this store) -------
+app.get("/insights", (_req, res) => res.sendFile(path.join(__dirname, "public", "insights.html")));
+app.get("/api/insights", (req, res) => {
+  const sid = req.ctx.store.id;
+  const mem = STORE_MEMORY[sid] || { patterns: [], updatedAt: null };
+  const patterns = (mem.patterns || []).slice()
+    .sort((a, b) => (b.count - a.count) || String(b.lastTs || "").localeCompare(String(a.lastTs || "")));
+  res.json({
+    storeName: req.ctx.store.name || sid,
+    reviewCount: storeReviewCount(sid),
+    updatedAt: mem.updatedAt || null,
+    activeInReviews: patterns.filter((p) => p.status !== "muted" && p.count >= 2).length,
+    patterns: patterns.map((p) => ({
+      key: p.key, label: p.label, kind: p.kind, severity: p.severity,
+      count: p.count, lastTs: p.lastTs, firstTs: p.firstTs,
+      status: p.status || "active", confirms: p.confirms || 0,
+    })),
+  });
+});
+app.post("/api/insights/:key/feedback", (req, res) => {
+  const sid = req.ctx.store.id;
+  const mem = STORE_MEMORY[sid];
+  if (!mem) return res.status(404).json({ error: "No learning data yet." });
+  const p = (mem.patterns || []).find((x) => x.key === req.params.key);
+  if (!p) return res.status(404).json({ error: "Not found." });
+  const action = (req.body && req.body.action) || "";
+  if (action === "mute") p.status = "muted";
+  else if (action === "unmute") p.status = "active";
+  else if (action === "confirm") { p.status = "active"; p.confirms = (p.confirms || 0) + 1; }
+  else return res.status(400).json({ error: "Unknown action." });
+  saveStoreMemory();
+  res.json({ ok: true, status: p.status, confirms: p.confirms || 0 });
 });
 app.get("/resources/file/:key", (req, res) => {
   const r = RESOURCE_BY_KEY[req.params.key];
@@ -1994,7 +2138,10 @@ app.post("/api/review", async (req, res) => {
     const vin = vinField || extractVin(ticket);
     // This store's rule customizations become part of the cache key AND the
     // prompt, so a store's tweaks re-score only its own tickets deterministically.
-    const rulesOverride = buildRuleOverrides(req.ctx.store);
+    // The store's own recurring-issue memory is appended so it both shapes the
+    // prompt AND participates in the cache key (a store's learned patterns
+    // re-score only its own tickets, deterministically).
+    const rulesOverride = buildRuleOverrides(req.ctx.store) + storeMemoryPromptSnippet(req.ctx.store.id);
     // Claim type is part of the cache key: the same repair on a different claim
     // type is a different review, so it must never collide in the cache.
     const key = reviewCacheKey("review", ticket, files, "ct:" + (f.claimType || "") + "|r:" + rulesOverride);
@@ -2039,6 +2186,8 @@ app.post("/api/review", async (req, res) => {
       recallInfo,
       pendingFiles: files,
     });
+    // Learn from this review so the store's memory sharpens over time.
+    try { learnFromReview(req.ctx.store.id, review, new Date().toISOString()); } catch (_) {}
     res.json({ review, recallInfo });
   } catch (e) {
     res.status(502).json({ error: e.message });
