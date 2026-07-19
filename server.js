@@ -1851,6 +1851,7 @@ const REPORT_DATASETS = {
       { key: "summary", label: "Summary", type: "string" },
     ],
     getRows: (scope) => HISTORY.filter((r) => r.type === "review" && scope.storeIds.has(r.storeId)).map((r) => ({
+      _id: r.id,
       ts: r.ts || "", storeName: storeNameById(r.storeId), userName: r.userName || "", ro: r.ro || "", line: r.line || "",
       claimLabel: r.claimLabel || r.claimType || "", vin: r.vin || "", vehicle: r.vehicle || "",
       mileage: parseNum(r.mileage), causalPart: r.causalPart || "", score: (r.score == null ? null : r.score),
@@ -1869,6 +1870,7 @@ const REPORT_DATASETS = {
       { key: "summary", label: "Reason", type: "string" },
     ],
     getRows: (scope) => HISTORY.filter((r) => r.type === "appeal" && scope.storeIds.has(r.storeId)).map((r) => ({
+      _id: r.id,
       ts: r.ts || "", storeName: storeNameById(r.storeId), userName: r.userName || "", ro: r.ro || "",
       vin: r.vin || "", verdict: r.verdict || "", summary: r.summary || "",
     })),
@@ -1978,7 +1980,7 @@ function runReport(q, scope) {
     rows = rows.filter((r) => applyFilter(r[f.field], f.op || "contains", f.value, col.type));
   }
   const groupBy = (Array.isArray(q.groupBy) ? q.groupBy : []).filter((k) => cols.some((c) => c.key === k));
-  let outCols, outRows;
+  let outCols, outRows, outIds = null;
   if (groupBy.length) {
     const aggs = normalizeAggs(q.agg, cols);
     const groups = new Map();
@@ -1994,16 +1996,24 @@ function runReport(q, scope) {
     const selKeys = (Array.isArray(q.columns) && q.columns.length) ? q.columns.filter((k) => cols.some((c) => c.key === k)) : cols.map((c) => c.key);
     outCols = selKeys.map((k) => { const c = cols.find((x) => x.key === k); return { key: k, label: c.label, type: c.type }; });
     outRows = rows.map((r) => selKeys.map((k) => r[k]));
+    // Carry each row's originating record id so the UI can deep-link an RO to its
+    // saved submission (and its uploaded documents). Detail mode only.
+    outIds = rows.map((r) => r._id || null);
   }
   if (q.sort && q.sort.field) {
     const ci = outCols.findIndex((c) => c.key === q.sort.field);
-    if (ci >= 0) { const dir = q.sort.dir === "desc" ? -1 : 1; outRows.sort((a, b) => cmpVals(a[ci], b[ci]) * dir); }
+    if (ci >= 0) {
+      const dir = q.sort.dir === "desc" ? -1 : 1;
+      const order = outRows.map((_, i) => i).sort((a, b) => cmpVals(outRows[a][ci], outRows[b][ci]) * dir);
+      outRows = order.map((i) => outRows[i]);
+      if (outIds) outIds = order.map((i) => outIds[i]);
+    }
   }
   const total = outRows.length;
   const limit = Math.min(Math.max(1, Number(q.limit) || 5000), 10000);
   const truncated = total > limit;
-  if (truncated) outRows = outRows.slice(0, limit);
-  return { dataset: dsKey, datasetLabel: ds.label, columns: outCols, rows: outRows, total, truncated };
+  if (truncated) { outRows = outRows.slice(0, limit); if (outIds) outIds = outIds.slice(0, limit); }
+  return { dataset: dsKey, datasetLabel: ds.label, columns: outCols, rows: outRows, rowIds: (outIds && outIds.some((x) => x)) ? outIds : undefined, total, truncated };
 }
 
 // --- Exporters --------------------------------------------------------------
