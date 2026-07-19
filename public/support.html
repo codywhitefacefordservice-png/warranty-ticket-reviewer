@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Help &amp; Support — Whiteface Ford</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8; --good:#0a8a3a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442; --good:#38c172; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:760px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  label{display:block;font-size:11.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 5px}
+  input,textarea,select{width:100%;padding:11px 13px;font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);resize:vertical}
+  textarea{min-height:130px}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,23,38,.04)}
+  button{padding:11px 22px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;margin-top:16px}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  button.primary:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.55;cursor:wait}
+  .hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .msg{margin-top:14px;font-size:14px;display:none;padding:12px 14px;border-radius:8px}
+  .msg.ok{display:block;background:rgba(10,138,58,.12);border:1px solid rgba(10,138,58,.4);color:var(--good)}
+  .msg.err{display:block;background:rgba(200,16,46,.10);border:1px solid rgba(200,16,46,.4);color:var(--red)}
+  .success{display:none;text-align:center;padding:26px 20px}
+  .success .check{font-size:40px;color:var(--good)}
+  .success h3{margin:8px 0 6px;font-size:18px}
+  .success p{color:var(--ink-2);font-size:14px;margin:0 0 16px}
+  .fine{margin-top:8px;color:var(--muted);font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" alt="" style="display:none">
+    <span id="wordmark" class="wordmark"><b></b><small></small></span>
+  </a>
+  <nav class="nav">
+    <a href="/">Reviewer</a>
+    <a href="/appeal">Appeals</a>
+    <a href="/history">History</a>
+    <a href="/resources">Resources</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">Help &amp; Support</div>
+  <div class="page-sub">Have a question, hit a snag, or want to request something? Send it here and it goes straight to our team. We'll follow up with you.</div>
+
+  <div class="card" id="formcard">
+    <label for="category">What's this about?</label>
+    <select id="category">
+      <option value="Question">General question</option>
+      <option value="Problem">Something isn't working</option>
+      <option value="Billing">Billing or account</option>
+      <option value="Feature request">Feature request / idea</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <label for="subject">Subject <span class="hint" style="text-transform:none;font-weight:400">(optional)</span></label>
+    <input id="subject" placeholder="A short summary, e.g. 'Photo won't upload'">
+
+    <label for="message">How can we help?</label>
+    <textarea id="message" placeholder="Tell us what you need. If it's a problem, what were you doing when it happened?"></textarea>
+    <div class="hint">Your name, store, and email are attached automatically so we can reply — you don't need to type them.</div>
+
+    <button class="primary" id="send">Send request</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="success" id="success">
+    <div class="check">✓</div>
+    <h3>Thanks — we got it.</h3>
+    <p>Your request has been sent to our team. We'll be in touch.</p>
+    <button id="another">Send another</button>
+  </div>
+
+  <div class="fine">Support requests are logged securely and reviewed by the ClaimProof team.</div>
+</div>
+
+<script>
+  const $=(id)=>document.getElementById(id);
+  function show(el,cls,txt){ el.className="msg "+cls; el.textContent=txt; }
+  $("send").addEventListener("click", async ()=>{
+    const message=$("message").value.trim();
+    if(!message){ show($("msg"),"err","Please describe what you need help with."); return; }
+    $("send").disabled=true; $("msg").className="msg"; $("msg").textContent="";
+    try{
+      const r=await fetch("/api/support",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({category:$("category").value,subject:$("subject").value.trim(),message})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok){ show($("msg"),"err",d.error||"Couldn't send that. Please try again."); $("send").disabled=false; return; }
+      $("formcard").style.display="none"; $("success").style.display="block";
+    }catch(e){ show($("msg"),"err","Network error — please try again."); }
+    $("send").disabled=false;
+  });
+  $("another").addEventListener("click", ()=>{
+    $("subject").value=""; $("message").value=""; $("category").selectedIndex=0;
+    $("success").style.display="none"; $("formcard").style.display="block"; $("msg").className="msg";
+  });
+</script>
+<script src="/appbrand.js"></script>
+</body>
+</html>
