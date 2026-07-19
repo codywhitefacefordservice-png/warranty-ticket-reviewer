@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>System Status — Whiteface Ford</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8; --good:#0a8a3a;
+    --amber:#b7791f; --gray:#8a94a6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442; --good:#38c172; --amber:#e0a63c; --gray:#7c8698; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,23,38,.04);overflow:hidden}
+  .banner{padding:16px 20px;display:flex;align-items:center;gap:12px;font-weight:800;font-size:16px;border-bottom:1px solid var(--border)}
+  .banner .big-dot{width:14px;height:14px;border-radius:50%}
+  .comp{display:flex;align-items:flex-start;gap:12px;padding:15px 20px;border-bottom:1px solid var(--grid)}
+  .comp:last-child{border-bottom:none}
+  .dot{width:11px;height:11px;border-radius:50%;margin-top:5px;flex:0 0 11px}
+  .comp .nm{font-weight:700;font-size:14.5px}
+  .comp .dt{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .comp .note{font-size:12.5px;margin-top:3px;color:var(--ink-2)}
+  .pill{margin-left:auto;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 10px;border-radius:999px;white-space:nowrap;align-self:center}
+  .lvl-operational{background:var(--good)} .lvl-operational-t{color:var(--good)}
+  .lvl-degraded{background:var(--amber)} .lvl-degraded-t{color:var(--amber)}
+  .lvl-maintenance{background:var(--brand-2)} .lvl-maintenance-t{color:var(--brand-2)}
+  .lvl-outage{background:var(--red)} .lvl-outage-t{color:var(--red)}
+  .lvl-unknown{background:var(--gray)} .lvl-unknown-t{color:var(--gray)}
+  .pill.lvl-operational,.pill.lvl-degraded,.pill.lvl-maintenance,.pill.lvl-outage,.pill.lvl-unknown{color:#fff}
+  .foot{display:flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap}
+  .checked{color:var(--muted);font-size:12.5px}
+  button{padding:9px 16px;font-size:13px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
+  button:hover{border-color:var(--brand-2)}
+  .links{margin-top:16px;font-size:12.5px;color:var(--muted)}
+  .links a{color:var(--brand-2);text-decoration:none} .links a:hover{text-decoration:underline}
+  .fine{margin-top:20px;color:var(--muted);font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" alt="" style="display:none">
+    <span id="wordmark" class="wordmark"><b></b><small></small></span>
+  </a>
+  <nav class="nav">
+    <a href="/">Reviewer</a>
+    <a href="/appeal">Appeals</a>
+    <a href="/history">History</a>
+    <a href="/resources">Resources</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">System Status</div>
+  <div class="page-sub">A live look at ClaimProof and the AI services it runs on. If something here is red or amber, a slowdown or error isn't on your end.</div>
+
+  <div class="card">
+    <div class="banner" id="banner"><span class="big-dot lvl-unknown"></span><span id="banner-text">Checking…</span></div>
+    <div id="comps">
+      <div class="comp"><span class="dot lvl-unknown"></span><div><div class="nm">Loading current status…</div></div></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button id="refresh">Refresh</button>
+    <span class="checked" id="checked"></span>
+  </div>
+
+  <div class="links">
+    Official provider status pages: <a href="https://status.render.com" target="_blank" rel="noopener">Render (hosting)</a> · <a href="https://status.anthropic.com" target="_blank" rel="noopener">Claude (Anthropic)</a> · <a href="https://status.openai.com" target="_blank" rel="noopener">ChatGPT (OpenAI)</a>
+  </div>
+
+  <div class="fine">This page reads each provider's official status feed and refreshes when you open it. Note: because this page is served by the app itself, it can always confirm Claude and ChatGPT status, but if the whole app were offline you wouldn't be able to load this page at all.</div>
+</div>
+
+<script>
+  const $=(id)=>document.getElementById(id);
+  const LABEL={operational:"Operational",degraded:"Degraded",maintenance:"Maintenance",outage:"Outage",unknown:"Unknown"};
+  const BANNER={operational:"All systems operational",degraded:"Some services degraded",maintenance:"Maintenance in progress",outage:"Service disruption",unknown:"Status partially unavailable"};
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  function when(iso){try{return new Date(iso).toLocaleString();}catch(e){return iso||"";}}
+  async function load(){
+    $("refresh").disabled=true;
+    try{
+      const d=await fetch("/api/status?_="+Date.now()).then(r=>r.json());
+      const ov=d.overall||"unknown";
+      $("banner").className="banner";
+      $("banner").querySelector(".big-dot").className="big-dot lvl-"+ov;
+      $("banner-text").textContent=BANNER[ov]||"Status";
+      $("banner-text").className="lvl-"+ov+"-t";
+      $("comps").innerHTML=(d.components||[]).map(c=>{
+        const lv=c.level||"unknown";
+        return '<div class="comp"><span class="dot lvl-'+lv+'"></span>'
+          +'<div><div class="nm">'+esc(c.name)+'</div>'
+          +(c.detail?'<div class="dt">'+esc(c.detail)+'</div>':'')
+          +(c.note?'<div class="note">'+esc(c.note)+'</div>':'')
+          +'</div><span class="pill lvl-'+lv+'">'+(LABEL[lv]||lv)+'</span></div>';
+      }).join("");
+      $("checked").textContent="Last checked "+when(d.checkedAt);
+    }catch(e){
+      $("banner-text").textContent="Couldn't load status.";
+    }
+    $("refresh").disabled=false;
+  }
+  $("refresh").addEventListener("click",load);
+  load();
+</script>
+<script src="/appbrand.js"></script>
+</body>
+</html>
