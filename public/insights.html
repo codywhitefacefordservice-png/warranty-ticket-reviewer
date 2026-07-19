@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Store Insights — Whiteface Ford</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8; --good:#0a8a3a; --amber:#b7791f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442; --good:#38c172; --amber:#e0a63c; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 64px}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:14px}
+  .meta{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:150px}
+  .stat .n{font-size:22px;font-weight:800}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0;overflow:hidden}
+  .item{display:flex;align-items:flex-start;gap:12px;padding:14px 18px;border-bottom:1px solid var(--grid)}
+  .item:last-child{border-bottom:none}
+  .item.muted{opacity:.5}
+  .dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:0 0 10px}
+  .sev-critical{background:var(--red)} .sev-serious{background:var(--amber)} .sev-warning{background:var(--brand-2)}
+  .it-main{flex:1;min-width:0}
+  .it-label{font-weight:700;font-size:14.5px}
+  .it-meta{font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:1px 7px;border-radius:999px;border:1px solid var(--border)}
+  .tag.guiding{color:#fff;background:var(--good);border-color:var(--good)}
+  .tag.mutedt{color:var(--muted)}
+  .tag.confirmed{color:var(--good);border-color:var(--good)}
+  .tag.kind{color:var(--ink-2)}
+  .cnt{font-weight:800;color:var(--ink)}
+  .acts{display:flex;gap:8px;align-items:center;flex:0 0 auto}
+  button{padding:7px 12px;font-size:12.5px;font-weight:700;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--ink);cursor:pointer}
+  button:hover{border-color:var(--brand-2)}
+  button.good{color:var(--good);border-color:rgba(10,138,58,.5)}
+  button:disabled{opacity:.5;cursor:wait}
+  .empty{padding:30px 20px;text-align:center;color:var(--muted)}
+  .explain{margin-top:16px;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .explain b{color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" alt="" style="display:none">
+    <span id="wordmark" class="wordmark"><b></b><small></small></span>
+  </a>
+  <nav class="nav">
+    <a href="/">Reviewer</a>
+    <a href="/appeal">Appeals</a>
+    <a href="/history">History</a>
+    <a href="/resources">Resources</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">Store Insights</div>
+  <div class="page-sub">What this store keeps getting flagged for. The reviewer learns these from your own past tickets and automatically watches for them on new reviews — so repeat mistakes get caught before they cost you a claim.</div>
+
+  <div class="meta" id="meta"></div>
+
+  <div class="card" id="list"><div class="empty">Loading…</div></div>
+
+  <div class="explain">
+    <b>How this works:</b> every time the reviewer flags a documentation problem, it's remembered for this store. Anything that has come up <b>2 or more times</b> is fed into future reviews so the AI checks for it specifically and points out when it's a repeat. Nothing is shared with other stores — this is only your history.<br>
+    <b>Confirm</b> a pattern to mark it as a real, worth-watching issue. <b>Mute</b> one to stop it from guiding reviews (use this if it's noise). Muted items stay here and can be un-muted anytime.
+  </div>
+</div>
+
+<script>
+  const $=(id)=>document.getElementById(id);
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  function when(iso){ if(!iso) return ""; try{ return new Date(iso).toLocaleDateString(); }catch(e){ return ""; } }
+  let DATA=null;
+  async function load(){
+    try{
+      DATA=await fetch("/api/insights?_="+Date.now()).then(r=>r.json());
+    }catch(e){ $("list").innerHTML='<div class="empty">Couldn’t load insights.</div>'; return; }
+    render();
+  }
+  function render(){
+    $("meta").innerHTML =
+      '<div class="stat"><div class="n">'+(DATA.reviewCount||0)+'</div><div class="l">reviews learned from</div></div>'+
+      '<div class="stat"><div class="n">'+(DATA.patterns?DATA.patterns.length:0)+'</div><div class="l">issue patterns tracked</div></div>'+
+      '<div class="stat"><div class="n">'+(DATA.activeInReviews||0)+'</div><div class="l">actively guiding new reviews</div></div>';
+    const ps=DATA.patterns||[];
+    if(!ps.length){
+      $("list").innerHTML='<div class="empty">No recurring patterns yet. Once this store has run a few reviews, the issues it keeps hitting will show up here automatically.</div>';
+      return;
+    }
+    $("list").innerHTML=ps.map(p=>{
+      const muted=p.status==="muted";
+      const guiding=!muted && p.count>=2;
+      const tags=[];
+      tags.push('<span class="tag kind">'+(p.kind==="risk"?"Rejection risk":"Missing / unclear")+'</span>');
+      if(guiding) tags.push('<span class="tag guiding">Guiding reviews</span>');
+      if(muted) tags.push('<span class="tag mutedt">Muted</span>');
+      if(p.confirms>0) tags.push('<span class="tag confirmed">Confirmed'+(p.confirms>1?" ("+p.confirms+")":"")+'</span>');
+      return '<div class="item '+(muted?"muted":"")+'">'+
+        '<span class="dot sev-'+esc(p.severity||"warning")+'"></span>'+
+        '<div class="it-main"><div class="it-label">'+esc(p.label)+'</div>'+
+        '<div class="it-meta"><span class="cnt">flagged '+p.count+'×</span>'+
+        (p.lastTs?'<span>last seen '+esc(when(p.lastTs))+'</span>':'')+
+        tags.join("")+'</div></div>'+
+        '<div class="acts">'+
+        '<button class="good" data-act="confirm" data-key="'+esc(p.key)+'">Confirm</button>'+
+        (muted
+          ? '<button data-act="unmute" data-key="'+esc(p.key)+'">Un-mute</button>'
+          : '<button data-act="mute" data-key="'+esc(p.key)+'">Mute</button>')+
+        '</div></div>';
+    }).join("");
+  }
+  document.addEventListener("click", async (e)=>{
+    const b=e.target.closest("[data-act]"); if(!b) return;
+    b.disabled=true;
+    try{
+      await fetch("/api/insights/"+encodeURIComponent(b.dataset.key)+"/feedback",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:b.dataset.act})});
+    }catch(_){}
+    await load();
+  });
+  load();
+</script>
+<script src="/appbrand.js"></script>
+</body>
+</html>
