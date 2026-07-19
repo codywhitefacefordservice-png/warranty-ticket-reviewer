@@ -58,6 +58,7 @@
   #results{display:none}
   .story-field{margin-bottom:14px}
   .story-field:last-child{margin-bottom:0}
+  .refined-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--brand-2,#2563eb);background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.35);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle;cursor:help}
   .sf-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
   .sf-label{font-size:11.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em}
   .sf-body{background:var(--page);border:1px solid var(--grid);border-radius:8px;padding:11px 13px;white-space:pre-wrap;font-size:14.5px}
@@ -136,7 +137,7 @@
 
   <div id="results">
     <div class="card">
-      <h2>Repair order story</h2>
+      <h2>Repair order story <span id="refinedBadge" class="refined-badge" style="display:none" title="Drafted by Claude with live web lookup, then refined and fact-checked by a second AI (ChatGPT)">✓ reviewed by 2 AIs</span></h2>
       <div class="story-field"><div class="sf-head"><span class="sf-label">Complaint / Concern</span><button class="copy" data-copy="o-complaint">Copy</button></div><div class="sf-body" id="o-complaint"></div></div>
       <div class="story-field"><div class="sf-head"><span class="sf-label">Cause</span><button class="copy" data-copy="o-cause">Copy</button></div><div class="sf-body" id="o-cause"></div></div>
       <div class="story-field"><div class="sf-head"><span class="sf-label">Correction</span><button class="copy" data-copy="o-correction">Copy</button></div><div class="sf-body" id="o-correction"></div></div>
@@ -180,6 +181,7 @@ $("go").addEventListener("click", async ()=>{
     if(!r.ok){ err.textContent=d.error||"Something went wrong. Try again."; err.style.display="block"; return; }
     const s=d.story;
     $("o-complaint").textContent=s.complaint; $("o-cause").textContent=s.cause; $("o-correction").textContent=s.correction; $("o-customer").textContent=s.customer;
+    $("refinedBadge").style.display = s.refined ? "inline-block" : "none";
     if(s.readings && s.readings.length){ $("o-readings").innerHTML=s.readings.map(r=>"<tr><td>"+esc(r.label)+"</td><td class='rd-sugg'>"+esc(r.suggested||"—")+"</td><td class='rd-spec'>"+esc(r.spec||"—")+"</td></tr>").join(""); $("readcard").style.display="block"; } else { $("readcard").style.display="none"; }
     if(s.sources && s.sources.length){ $("o-sources").innerHTML=s.sources.map(x=>'<div class="src"><a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.title||x.url)+'</a></div>').join(""); $("srccard").style.display="block"; } else { $("srccard").style.display="none"; }
     if(s.tips && s.tips.length){ $("o-tips").innerHTML=s.tips.map(t=>"<li>"+esc(t)+"</li>").join(""); $("tipcard").style.display="block"; } else { $("tipcard").style.display="none"; }
