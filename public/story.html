@@ -180,7 +180,8 @@ $("go").addEventListener("click", async ()=>{
     const d=await r.json();
     if(!r.ok){ err.textContent=d.error||"Something went wrong. Try again."; err.style.display="block"; return; }
     const s=d.story;
-    $("o-complaint").textContent=s.complaint; $("o-cause").textContent=s.cause; $("o-correction").textContent=s.correction; $("o-customer").textContent=s.customer;
+    const UP=(x)=>String(x==null?"":x).toUpperCase();
+    $("o-complaint").textContent=UP(s.complaint); $("o-cause").textContent=UP(s.cause); $("o-correction").textContent=UP(s.correction); $("o-customer").textContent=UP(s.customer);
     $("refinedBadge").style.display = s.refined ? "inline-block" : "none";
     if(s.readings && s.readings.length){ $("o-readings").innerHTML=s.readings.map(r=>"<tr><td>"+esc(r.label)+"</td><td class='rd-sugg'>"+esc(r.suggested||"—")+"</td><td class='rd-spec'>"+esc(r.spec||"—")+"</td></tr>").join(""); $("readcard").style.display="block"; } else { $("readcard").style.display="none"; }
     if(s.sources && s.sources.length){ $("o-sources").innerHTML=s.sources.map(x=>'<div class="src"><a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.title||x.url)+'</a></div>').join(""); $("srccard").style.display="block"; } else { $("srccard").style.display="none"; }
