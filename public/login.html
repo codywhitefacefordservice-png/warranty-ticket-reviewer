@@ -7,29 +7,26 @@
 <title>Sign in — ClaimProof</title>
 <style>
   :root{
-    color-scheme: light dark;
-    --brand:#12294d; --brand-2:#2f80ed; --accent:#2f80ed;
-    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --border:#d7dee8; --bad:#c8102e;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{ --brand:#2b527f; --brand-2:#5b8def;
-      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --border:#2b3442; --bad:#ef5a6f; }
+    color-scheme:light;
+    --brand:#123a86; --brand-2:#2f6bd8; --accent:#2f6bd8;
+    --page:#f4f6f9; --surface:#ffffff; --ink:#141b2b; --ink-2:#5a6577; --border:#e6e9f0; --line-2:#eef1f6; --bad:#c8102e;
   }
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--page);
-       font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink)}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
-        width:min(92vw,420px);box-shadow:0 8px 30px rgba(16,23,38,.10);overflow:hidden}
-  .cap{background:#ffffff;padding:26px 32px 20px;text-align:center;border-bottom:1px solid var(--border)}
-  .cap svg{width:min(70vw,260px);height:auto;display:inline-block}
-  .body{padding:24px 32px 30px}
-  h1{font-size:16px;margin:0 0 4px;font-weight:800}
-  p{margin:0 0 16px;color:var(--ink-2);font-size:13.5px}
-  label{display:block;font-size:12px;font-weight:700;color:var(--ink-2);margin:12px 0 5px;text-transform:uppercase;letter-spacing:.04em}
-  input{width:100%;padding:11px 13px;font-size:16px;border:1px solid var(--border);border-radius:8px;background:var(--page);color:var(--ink)}
-  input:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
-  button{margin-top:18px;width:100%;padding:12px;font-size:15px;font-weight:700;border:0;border-radius:8px;background:var(--brand);color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(18,41,77,.30),inset 0 1px 0 rgba(255,255,255,.15);transition:box-shadow .12s ease,transform .05s ease,filter .12s ease}
-  button:hover{filter:brightness(1.15);box-shadow:0 5px 12px rgba(18,41,77,.34),inset 0 1px 0 rgba(255,255,255,.15)}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;
+       background:radial-gradient(1100px 520px at 50% -260px, rgba(47,107,216,.12), transparent 60%), var(--page);
+       font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+        width:min(94vw,420px);box-shadow:0 1px 3px rgba(16,24,40,.06),0 24px 48px -24px rgba(16,24,40,.35);overflow:hidden}
+  .cap{background:linear-gradient(180deg,#fafcff,#ffffff);padding:30px 32px 22px;text-align:center;border-bottom:1px solid var(--line-2)}
+  .cap svg{width:min(70vw,250px);height:auto;display:inline-block}
+  .body{padding:26px 32px 32px}
+  h1{font-size:19px;margin:0 0 5px;font-weight:800;letter-spacing:-.01em}
+  p{margin:0 0 18px;color:var(--ink-2);font-size:14px}
+  label{display:block;font-size:12px;font-weight:700;color:var(--ink-2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+  input{width:100%;padding:12px 14px;font-size:16px;border:1px solid #d9dee8;border-radius:10px;background:#fff;color:var(--ink);transition:border-color .13s,box-shadow .13s}
+  input:focus{outline:none;border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(47,107,216,.16)}
+  button{margin-top:22px;width:100%;padding:13px;font-size:15px;font-weight:700;border:0;border-radius:10px;background:var(--brand);color:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(18,58,134,.26);transition:background .13s ease,box-shadow .13s ease,transform .05s ease}
+  button:hover{background:#0f337a;box-shadow:0 6px 16px rgba(18,58,134,.32)}
   button:active{transform:translateY(1px)}
   .msg{color:var(--bad);font-size:14px;min-height:20px;margin:12px 0 0;text-align:center}
 </style>
