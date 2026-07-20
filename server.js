@@ -1042,7 +1042,8 @@ function recordBlob(r) {
   let b = BLOBS.get(r.id);
   if (!b) {
     try {
-      b = JSON.stringify([r.ro, r.vin, r.vehicle, r.summary, r.ticket, r.rejection, r.result, r.recallInfo]).toLowerCase();
+      b = JSON.stringify([r.ro, r.vin, r.vehicle, r.summary, r.ticket, r.rejection, r.result, r.recallInfo,
+        r.causalPart, causalBase(r.causalPart), (r.outcome && [r.outcome.status, r.outcome.reason, r.outcome.notes])]).toLowerCase();
     } catch { b = ""; }
     BLOBS.set(r.id, b);
   }
@@ -2459,6 +2460,39 @@ function parseNum(v) {
 }
 function yesno(v) { return v ? "Yes" : "No"; }
 
+// ---------------------------------------------------------------------------
+// Claim outcome tracking. After a claim is submitted, the store logs what
+// actually happened — approved, denied, adjusted, charged back. This closes the
+// loop: it powers denial-rate reporting, dollars paid/lost, and shows which
+// causal parts and advisors drive denials. Stored per review record as
+// rec.outcome; a record with nothing logged is treated as "pending".
+// ---------------------------------------------------------------------------
+const OUTCOME_STATUSES = [
+  { id: "pending", label: "Pending" },
+  { id: "approved", label: "Approved / paid" },
+  { id: "denied", label: "Denied" },
+  { id: "adjusted", label: "Adjusted / short-paid" },
+  { id: "charged_back", label: "Charged back" },
+  { id: "resubmitted", label: "Resubmitted" },
+];
+const OUTCOME_LABEL = Object.fromEntries(OUTCOME_STATUSES.map((o) => [o.id, o.label]));
+function outcomeStatusOf(r) { return (r && r.outcome && r.outcome.status) || "pending"; }
+
+// Ford part numbers are PREFIX-BASE-SUFFIX (e.g. FL3Z-9G756-A). The BASE
+// (9G756) identifies the component regardless of application, and its first
+// digit maps to a system (6 engine, 7 transmission, 9 fuel, ...), so reporting
+// and search key off the base. Best-effort extractor, tolerant of formats.
+function causalBase(pn) {
+  const s = String(pn || "").toUpperCase().trim();
+  if (!s) return "";
+  if (s.indexOf("NPF") === 0) return "NPF";
+  const t = s.split(/[^A-Z0-9]+/).filter(Boolean);
+  if (t.length >= 3) return t[1];
+  if (t.length === 2) return /^[A-Z]{1,2}$/.test(t[1]) ? t[0] : t[1];
+  const m = (t[0] || "").match(/^([A-Z0-9]{3,4}Z)([0-9][A-Z0-9]*?)([A-Z]*)$/);
+  return m ? m[2] : (t[0] || "");
+}
+
 const REPORT_DATASETS = {
   reviews: {
     label: "Warranty reviews",
@@ -2473,17 +2507,33 @@ const REPORT_DATASETS = {
       { key: "vehicle", label: "Vehicle", type: "string" },
       { key: "mileage", label: "Mileage", type: "number" },
       { key: "causalPart", label: "Causal part", type: "string" },
+      { key: "causalBase", label: "Causal base", type: "string" },
       { key: "score", label: "Score", type: "number" },
       { key: "verdict", label: "Verdict", type: "string" },
+      { key: "outcomeStatus", label: "Outcome", type: "string" },
+      { key: "decidedAt", label: "Outcome date", type: "date" },
+      { key: "claimAmount", label: "Claim $", type: "number" },
+      { key: "paidAmount", label: "Paid $", type: "number" },
+      { key: "chargebackAmount", label: "Chargeback $", type: "number" },
+      { key: "netAmount", label: "Net $", type: "number" },
+      { key: "denialReason", label: "Denial reason", type: "string" },
       { key: "summary", label: "Summary", type: "string" },
     ],
-    getRows: (scope) => HISTORY.filter((r) => r.type === "review" && scope.storeIds.has(r.storeId)).map((r) => ({
-      _id: r.id,
-      ts: r.ts || "", storeName: storeNameById(r.storeId), userName: r.userName || "", ro: r.ro || "", line: r.line || "",
-      claimLabel: r.claimLabel || r.claimType || "", vin: r.vin || "", vehicle: r.vehicle || "",
-      mileage: parseNum(r.mileage), causalPart: r.causalPart || "", score: (r.score == null ? null : r.score),
-      verdict: r.verdict || "", summary: r.summary || "",
-    })),
+    getRows: (scope) => HISTORY.filter((r) => r.type === "review" && scope.storeIds.has(r.storeId)).map((r) => {
+      const o = r.outcome || {};
+      const paid = parseNum(o.paidAmount), cb = parseNum(o.chargebackAmount);
+      const net = (paid == null && cb == null) ? null : (paid || 0) - (cb || 0);
+      return {
+        _id: r.id,
+        ts: r.ts || "", storeName: storeNameById(r.storeId), userName: r.userName || "", ro: r.ro || "", line: r.line || "",
+        claimLabel: r.claimLabel || r.claimType || "", vin: r.vin || "", vehicle: r.vehicle || "",
+        mileage: parseNum(r.mileage), causalPart: r.causalPart || "", causalBase: causalBase(r.causalPart),
+        score: (r.score == null ? null : r.score), verdict: r.verdict || "",
+        outcomeStatus: OUTCOME_LABEL[outcomeStatusOf(r)], decidedAt: o.decidedAt || "",
+        claimAmount: parseNum(o.claimAmount), paidAmount: paid, chargebackAmount: cb, netAmount: net,
+        denialReason: o.reason || "", summary: r.summary || "",
+      };
+    }),
   },
   appeals: {
     label: "Appeals",
@@ -2526,6 +2576,13 @@ function reportPresets() {
     { id: "rev_by_advisor", label: "Reviews — by advisor", query: { dataset: "reviews", groupBy: ["userName"], agg: [{ fn: "count" }, { fn: "avg", field: "score" }], sort: { field: "count", dir: "desc" } } },
     { id: "rev_low", label: "Reviews — low scores (under 70)", query: { dataset: "reviews", filters: [{ field: "score", op: "lt", value: "70" }], sort: { field: "score", dir: "asc" } } },
     { id: "rev_detail_30", label: "Reviews — detail, last 30 days", query: { dataset: "reviews", from: d, sort: { field: "ts", dir: "desc" } } },
+    { id: "out_breakdown", label: "Outcomes — breakdown by result", query: { dataset: "reviews", groupBy: ["outcomeStatus"], agg: [{ fn: "count" }], sort: { field: "count", dir: "desc" } } },
+    { id: "out_denied_part", label: "Denials — by causal part base", query: { dataset: "reviews", filters: [{ field: "outcomeStatus", op: "eq", value: "Denied" }], groupBy: ["causalBase"], agg: [{ fn: "count" }], sort: { field: "count", dir: "desc" } } },
+    { id: "out_denied_adv", label: "Denials — by advisor", query: { dataset: "reviews", filters: [{ field: "outcomeStatus", op: "eq", value: "Denied" }], groupBy: ["userName"], agg: [{ fn: "count" }], sort: { field: "count", dir: "desc" } } },
+    { id: "out_chargebacks", label: "Chargebacks — detail", query: { dataset: "reviews", filters: [{ field: "outcomeStatus", op: "eq", value: "Charged back" }], sort: { field: "ts", dir: "desc" } } },
+    { id: "out_pending", label: "Outcomes — pending (need logging)", query: { dataset: "reviews", filters: [{ field: "outcomeStatus", op: "eq", value: "Pending" }], sort: { field: "ts", dir: "desc" } } },
+    { id: "out_paid_claim", label: "Dollars paid — by claim type", query: { dataset: "reviews", groupBy: ["claimLabel"], agg: [{ fn: "count" }, { fn: "sum", field: "paidAmount" }], sort: { field: "sum_paidAmount", dir: "desc" } } },
+    { id: "out_score_result", label: "Avg score by outcome", query: { dataset: "reviews", groupBy: ["outcomeStatus"], agg: [{ fn: "count" }, { fn: "avg", field: "score" }], sort: { field: "count", dir: "desc" } } },
     { id: "app_by_strength", label: "Appeals — count by strength", query: { dataset: "appeals", groupBy: ["verdict"], agg: [{ fn: "count" }], sort: { field: "count", dir: "desc" } } },
     { id: "story_by_advisor", label: "Story usage — by advisor", query: { dataset: "stories", groupBy: ["userName"], agg: [{ fn: "count" }], sort: { field: "count", dir: "desc" } } },
     { id: "story_detail", label: "Story usage — detail", query: { dataset: "stories", sort: { field: "ts", dir: "desc" } } },
@@ -2810,31 +2867,38 @@ app.get("/api/history", (req, res) => {
   const records = search.records.filter((r) => r.storeId === sid);
   const band = SCORE_BAND_BY_ID[req.query.band] || null;
   const cat = CATEGORY_IDS.includes(req.query.cat) ? req.query.cat : null;
+  const oc = OUTCOME_LABEL[req.query.outcome] ? req.query.outcome : null;
   const inBand = (r) => (band ? r.score != null && r.score >= band.min && r.score <= band.max : true);
   const inCat = (r) => (cat ? categorizeRepair(r) === cat : true);
+  const inOutcome = (r) => (oc ? outcomeStatusOf(r) === oc : true);
 
   // Faceted counts: category counts respect the active band (and vice-versa) so
   // each dropdown shows how many records that choice would surface right now.
   const categoryCounts = {}; for (const id of CATEGORY_IDS) categoryCounts[id] = 0;
   const bandCounts = {}; for (const b of SCORE_BANDS) bandCounts[b.id] = 0;
+  const outcomeCounts = {}; for (const o of OUTCOME_STATUSES) outcomeCounts[o.id] = 0;
   for (const r of records) {
-    if (inBand(r)) categoryCounts[categorizeRepair(r)]++;
-    if (inCat(r)) { const bb = scoreBandOf(r.score); if (bb) bandCounts[bb]++; }
+    if (inBand(r) && inOutcome(r)) categoryCounts[categorizeRepair(r)]++;
+    if (inCat(r) && inOutcome(r)) { const bb = scoreBandOf(r.score); if (bb) bandCounts[bb]++; }
+    if (inBand(r) && inCat(r)) outcomeCounts[outcomeStatusOf(r)]++;
   }
 
-  const filtered = records.filter((r) => inBand(r) && inCat(r));
+  const filtered = records.filter((r) => inBand(r) && inCat(r) && inOutcome(r));
   const list = filtered.slice(offset, offset + limit).map((r) => {
     const c = categorizeRepair(r);
+    const os = outcomeStatusOf(r);
     return {
       id: r.id, ts: r.ts, type: r.type, ro: r.ro, vin: r.vin, vehicle: r.vehicle,
       score: r.score, verdict: r.verdict, summary: String(r.summary || "").slice(0, 220),
       category: c, categoryLabel: CATEGORY_LABEL[c], claimLabel: r.claimLabel || "",
+      causalPart: r.causalPart || "", outcome: os, outcomeLabel: OUTCOME_LABEL[os],
     };
   });
   const storeTotal = HISTORY.reduce((n, r) => n + (r.storeId === sid ? 1 : 0), 0);
   res.json({
     total: storeTotal, matched: filtered.length, offset, fallback, needles, results: list,
-    categoryCounts, bandCounts, categories: CATEGORY_META, bands: SCORE_BANDS,
+    categoryCounts, bandCounts, outcomeCounts, categories: CATEGORY_META, bands: SCORE_BANDS,
+    outcomes: OUTCOME_STATUSES,
   });
 });
 
@@ -2842,6 +2906,35 @@ app.get("/api/history/:id", (req, res) => {
   const rec = HISTORY.find((r) => r.id === req.params.id);
   if (!rec || rec.storeId !== req.ctx.store.id) return res.status(404).json({ error: "Not found" });
   res.json({ record: rec, fields: recordFields(rec) });
+});
+
+// Log / update what actually happened to a submitted claim (store-scoped).
+app.post("/api/history/:id/outcome", (req, res) => {
+  const rec = HISTORY.find((r) => r.id === req.params.id);
+  if (!rec || rec.storeId !== req.ctx.store.id) return res.status(404).json({ error: "Not found" });
+  if (rec.type !== "review") return res.status(400).json({ error: "Outcomes apply to reviews only." });
+  const b = req.body || {};
+  const status = OUTCOME_LABEL[b.status] ? b.status : "pending";
+  const money = (v) => { const n = parseNum(v); return n == null ? null : n; };
+  const prev = rec.outcome || {};
+  if (status === "pending" && !b.reason && !b.notes && money(b.claimAmount) == null && money(b.paidAmount) == null && money(b.chargebackAmount) == null) {
+    delete rec.outcome; // fully clearing an outcome back to unlogged
+  } else {
+    rec.outcome = {
+      status,
+      claimAmount: money(b.claimAmount),
+      paidAmount: money(b.paidAmount),
+      chargebackAmount: money(b.chargebackAmount),
+      reason: String(b.reason || "").trim().slice(0, 500),
+      notes: String(b.notes || "").trim().slice(0, 2000),
+      decidedAt: status === "pending" ? "" : (String(b.decidedAt || "").trim().slice(0, 10) || prev.decidedAt || new Date().toISOString().slice(0, 10)),
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.ctx.user.name || req.ctx.user.email,
+    };
+  }
+  BLOBS.delete(rec.id);
+  saveHistory();
+  res.json({ ok: true, outcome: rec.outcome || { status: "pending" } });
 });
 
 // Serve a retained attachment for a saved submission (inline, or ?dl=1 to download).
