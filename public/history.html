@@ -64,6 +64,22 @@
   .detail{display:none;margin-top:12px;border-top:1px solid var(--grid);padding-top:12px}
   .detail pre{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Consolas,monospace;background:var(--page);border:1px solid var(--grid);border-radius:8px;padding:10px 12px;max-height:320px;overflow:auto}
   .kv{margin:6px 0;color:var(--ink-2)} .kv b{color:var(--ink)}
+  .b-out{text-transform:none;letter-spacing:0}
+  .out-approved{color:var(--good-ink);background:rgba(10,138,58,.14)}
+  .out-denied{color:var(--critical);background:rgba(200,16,46,.12)}
+  .out-adjusted{color:var(--warning);background:rgba(183,121,31,.16)}
+  .out-charged_back{color:var(--critical);background:rgba(200,16,46,.12)}
+  .out-resubmitted{color:var(--brand-2);background:rgba(10,75,179,.12)}
+  .oc{margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--page)}
+  .oc h4{margin:0 0 10px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+  .oc-grid{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .oc-f{display:flex;flex-direction:column;gap:4px}
+  .oc-f label{font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em}
+  .oc-f input,.oc-f select,.oc-f textarea{padding:8px 10px;font-size:13.5px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--ink)}
+  .oc-f.amt input{width:110px} .oc-f.dt input{width:160px}
+  .oc-f.grow{flex:1 1 220px} .oc-f.grow textarea{min-height:44px;resize:vertical;width:100%}
+  .oc-foot{margin-top:10px;display:flex;align-items:center;gap:8px}
+  .oc-msg{font-size:12.5px;color:var(--good-ink)}
   .att{display:inline-block;white-space:nowrap;margin:2px 0} .att-sz{color:var(--muted);font-size:12px}
   .del{font-size:12px;padding:3px 11px;color:var(--critical)}
   .rerun{font-size:12px;padding:4px 13px;font-weight:700;color:#fff;background:var(--brand);border-color:var(--brand);margin-right:8px;box-shadow:0 2px 6px rgba(0,52,120,.30),inset 0 1px 0 rgba(255,255,255,.15)}
@@ -109,6 +125,7 @@
     <select id="ftype"><option value="">All types</option><option value="review">Reviews</option><option value="appeal">Appeals</option></select>
     <select id="fverdict"><option value="">Any verdict</option><option value="ready">Ready</option><option value="needs_work">Needs work</option><option value="high_risk">High risk</option><option value="strong">Strong appeal</option><option value="moderate">Moderate appeal</option><option value="weak">Weak appeal</option></select>
     <select id="fdays"><option value="">Any time</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option></select>
+    <select id="foutcome"><option value="">All outcomes</option></select>
     <span class="hint" id="count"></span>
   </div>
 
@@ -151,6 +168,7 @@ function params(){
   if ($("ftype").value) p.set("type", $("ftype").value);
   if ($("fverdict").value) p.set("verdict", $("fverdict").value);
   if ($("fdays").value) p.set("days", $("fdays").value);
+  if ($("foutcome").value) p.set("outcome", $("foutcome").value);
   return p;
 }
 function opt(v, label){ const o = document.createElement("option"); o.value = v; o.textContent = label; return o; }
@@ -163,6 +181,10 @@ function populateFacets(data){
   bandSel.innerHTML = ""; bandSel.appendChild(opt("", "All scores"));
   (data.bands || []).forEach(b => bandSel.appendChild(opt(b.id, b.label + " (" + ((data.bandCounts || {})[b.id] || 0) + ")")));
   bandSel.value = bandVal;
+  const outSel = $("foutcome"); const outVal = outSel.value;
+  outSel.innerHTML = ""; outSel.appendChild(opt("", "All outcomes"));
+  (data.outcomes || []).forEach(o => outSel.appendChild(opt(o.id, o.label + " (" + ((data.outcomeCounts || {})[o.id] || 0) + ")")));
+  outSel.value = outVal;
 }
 async function load(append){
   if (!append) offset = 0;
@@ -179,11 +201,13 @@ async function load(append){
       ? '<span class="badge b-appeal">APPEAL</span> <span class="badge b-' + esc(r.verdict) + '">' + esc(r.verdict || "") + "</span>"
       : '<span class="badge b-' + esc(r.verdict) + '">' + (r.score != null ? r.score + "/100" : "") + " " + esc(String(r.verdict || "").replace("_", " ")) + "</span>";
     const catBadge = r.categoryLabel ? '<span class="badge b-cat">' + esc(r.categoryLabel) + "</span> " : "";
+    const outBadge = (r.type === "review" && r.outcome && r.outcome !== "pending")
+      ? '<span class="badge b-out out-' + esc(r.outcome) + '">' + esc(r.outcomeLabel || r.outcome) + "</span> " : "";
     return `<div class="card" data-id="${r.id}"><div class="row">
         <span class="ro">${r.ro ? "RO# " + hilite(r.ro) : "(no RO#)"}</span>
         ${r.vehicle ? '<span class="sub2">' + hilite(r.vehicle) + "</span>" : ""}
         ${r.vin ? '<span class="sub2">' + hilite(r.vin) + "</span>" : ""}
-        ${catBadge}${badge}<span class="when">${when(r.ts)}</span></div>
+        ${catBadge}${outBadge}${badge}<span class="when">${when(r.ts)}</span></div>
       <div class="snip">${hilite(r.summary)}</div><div class="detail" id="d-${r.id}"></div></div>`;
   }).join("");
   if (append) $("list").insertAdjacentHTML("beforeend", html);
@@ -191,6 +215,68 @@ async function load(append){
   offset += data.results.length;
   $("more").style.display = offset < data.matched ? "block" : "none";
   [...document.querySelectorAll(".card")].forEach(c => { if (!c.dataset.wired){ c.dataset.wired = "1"; c.addEventListener("click", () => open(c.dataset.id)); } });
+}
+const OUTCOMES = [
+  ["pending","Pending — not yet submitted / awaiting result"],
+  ["approved","Approved / paid"],
+  ["denied","Denied"],
+  ["adjusted","Adjusted / short-paid"],
+  ["charged_back","Charged back"],
+  ["resubmitted","Resubmitted"],
+];
+function outcomeEditor(o){
+  const cur = o.status || "pending";
+  const optionsHtml = OUTCOMES.map(([v,l]) => '<option value="'+v+'"'+(v===cur?' selected':'')+'>'+esc(l)+'</option>').join("");
+  const val = (x) => (x==null?"":esc(String(x)));
+  return '<div class="oc" onclick="event.stopPropagation()">'
+    + '<h4>Claim outcome</h4>'
+    + '<div class="oc-grid">'
+      + '<div class="oc-f"><label>Result</label><select class="oc-status">'+optionsHtml+'</select></div>'
+      + '<div class="oc-f dt"><label>Outcome date</label><input type="date" class="oc-date" value="'+val(o.decidedAt)+'"></div>'
+      + '<div class="oc-f amt"><label>Claim $</label><input type="text" inputmode="decimal" class="oc-claim" value="'+val(o.claimAmount)+'"></div>'
+      + '<div class="oc-f amt"><label>Paid $</label><input type="text" inputmode="decimal" class="oc-paid" value="'+val(o.paidAmount)+'"></div>'
+      + '<div class="oc-f amt"><label>Chargeback $</label><input type="text" inputmode="decimal" class="oc-cb" value="'+val(o.chargebackAmount)+'"></div>'
+    + '</div>'
+    + '<div class="oc-grid" style="margin-top:10px">'
+      + '<div class="oc-f grow"><label>Denial / adjustment reason</label><input type="text" class="oc-reason" placeholder="e.g. causal part not documented; labor op mismatch" value="'+val(o.reason)+'"></div>'
+    + '</div>'
+    + '<div class="oc-grid" style="margin-top:10px">'
+      + '<div class="oc-f grow"><label>Notes</label><textarea class="oc-notes" placeholder="anything worth remembering about this claim">'+val(o.notes)+'</textarea></div>'
+    + '</div>'
+    + '<div class="oc-foot"><button class="primary oc-save">Save outcome</button><span class="oc-msg"></span>'
+      + (o.updatedBy ? '<span class="oc-msg" style="color:var(--ink-2)">last updated by '+esc(o.updatedBy)+'</span>' : '')
+    + '</div>'
+  + '</div>';
+}
+function wireOutcome(d, id){
+  const box = d.querySelector(".oc"); if (!box) return;
+  const btn = box.querySelector(".oc-save"), msg = box.querySelector(".oc-msg");
+  btn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    btn.disabled = true; msg.style.color = ""; msg.textContent = "Saving…";
+    const body = {
+      status: box.querySelector(".oc-status").value,
+      decidedAt: box.querySelector(".oc-date").value,
+      claimAmount: box.querySelector(".oc-claim").value,
+      paidAmount: box.querySelector(".oc-paid").value,
+      chargebackAmount: box.querySelector(".oc-cb").value,
+      reason: box.querySelector(".oc-reason").value,
+      notes: box.querySelector(".oc-notes").value,
+    };
+    try {
+      const r = await fetch("/api/history/" + encodeURIComponent(id) + "/outcome", {
+        method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify(body),
+      });
+      if (!r.ok){ const j = await r.json().catch(()=>({})); throw new Error(j.error || "Save failed"); }
+      msg.textContent = "Saved ✓";
+      // Refresh the list so the badge and outcome filter counts update.
+      load(false);
+      setTimeout(() => { if (msg) msg.textContent = ""; }, 1800);
+    } catch (err) {
+      msg.style.color = "var(--critical)"; msg.textContent = err.message || "Couldn't save.";
+    }
+    btn.disabled = false;
+  });
 }
 async function open(id){
   const d = $("d-" + id);
@@ -212,6 +298,7 @@ async function open(id){
       html += '<div class="kv"><b>Rejection notice:</b></div><pre>' + esc(record.rejection) + "</pre>";
       if (record.ticket) html += '<div class="kv"><b>Original claim:</b></div><pre>' + esc(record.ticket) + "</pre>";
     }
+    if (record.type === "review") html += outcomeEditor(record.outcome || {});
     if (Array.isArray(record.files) && record.files.length){
       const kb = (n) => n >= 1048576 ? (n/1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n/1024)) + " KB";
       html += '<div class="kv"><b>Attached documents:</b> ' + record.files.map(f => {
@@ -224,6 +311,7 @@ async function open(id){
     if (record.type === "review") html += '<button class="rerun" data-id="' + id + '">Re-run in Reviewer</button>';
     html += '<button class="del" data-id="' + id + '">Delete this record</button>';
     d.innerHTML = html;
+    if (record.type === "review") wireOutcome(d, id);
     const rb = d.querySelector(".rerun");
     if (rb) rb.addEventListener("click", (e) => { e.stopPropagation(); location.href = "/?rerun=" + encodeURIComponent(id); });
     d.querySelector(".del").addEventListener("click", async (e) => { e.stopPropagation();
@@ -261,7 +349,7 @@ async function deeplink(){
 $("go").addEventListener("click", () => load(false));
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") load(false); });
 $("more").addEventListener("click", () => load(true));
-["fcat","fband","ftype","fverdict","fdays"].forEach(id => $(id).addEventListener("change", () => load(false)));
+["fcat","fband","ftype","fverdict","fdays","foutcome"].forEach(id => $(id).addEventListener("change", () => load(false)));
 load(false);
 deeplink();
 </script>
