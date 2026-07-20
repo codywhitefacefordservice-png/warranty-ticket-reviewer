@@ -530,33 +530,26 @@ async function fetchJson(url, ms) {
 }
 
 async function lookupRecalls(vin) {
+  const d = await decodeVin(vin);
+  if (!d.ok) return { vin, error: d.error || "Could not decode this VIN." };
+  const { year, make, model } = d;
+  let list = [];
   try {
-    const dec = await fetchJson(
-      "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/" + encodeURIComponent(vin) + "?format=json"
+    const rec = await fetchJson(
+      "https://api.nhtsa.gov/recalls/recallsByVehicle?make=" + encodeURIComponent(make) +
+      "&model=" + encodeURIComponent(model) + "&modelYear=" + encodeURIComponent(year)
     );
-    const v = dec?.Results?.[0] || {};
-    const year = v.ModelYear, make = v.Make, model = v.Model;
-    if (!year || !make || !model) return { vin, error: "Could not decode this VIN." };
-    let list = [];
-    try {
-      const rec = await fetchJson(
-        "https://api.nhtsa.gov/recalls/recallsByVehicle?make=" + encodeURIComponent(make) +
-        "&model=" + encodeURIComponent(model) + "&modelYear=" + encodeURIComponent(year)
-      );
-      list = (rec?.results || []).map((x) => ({
-        campaign: x.NHTSACampaignNumber || "",
-        date: x.ReportReceivedDate || "",
-        component: x.Component || "",
-        summary: String(x.Summary || "").slice(0, 400),
-        remedy: String(x.Remedy || "").slice(0, 300),
-      }));
-    } catch (e) {
-      return { vin, year, make, model, error: "VIN decoded but recall lookup failed: " + e.message };
-    }
-    return { vin, year, make, model, recalls: list };
+    list = (rec?.results || []).map((x) => ({
+      campaign: x.NHTSACampaignNumber || "",
+      date: x.ReportReceivedDate || "",
+      component: x.Component || "",
+      summary: String(x.Summary || "").slice(0, 400),
+      remedy: String(x.Remedy || "").slice(0, 300),
+    }));
   } catch (e) {
-    return { vin, error: "NHTSA lookup failed: " + e.message };
+    return { vin, year, make, model, vehicleLabel: d.label, error: "VIN decoded but recall lookup failed: " + e.message };
   }
+  return { vin, year, make, model, vehicleLabel: d.label, recalls: list };
 }
 
 function recallContext(info) {
@@ -598,6 +591,59 @@ const HISTORY_FILE = path.join(HISTORY_DIR, "history.json");
 // history.json stays small and the FULL submission — hard cards, PDFs, photos —
 // is retained on the persistent disk and can be re-downloaded from History.
 const HISTORY_FILES_DIR = path.join(HISTORY_DIR, "history-files");
+
+// ---------------------------------------------------------------------------
+// VIN decoding (NHTSA vPIC — free, no key, no partnership). Cached forever
+// since a VIN never changes. Powers the "Decode VIN" button everywhere a VIN
+// is entered, and the vehicle it returns is the handoff a repair-data
+// integration (e.g. ProDemand) would key off of.
+// ---------------------------------------------------------------------------
+const VIN_CACHE_FILE = path.join(HISTORY_DIR, "vin_cache.json");
+let VIN_CACHE = {};
+try { if (fs.existsSync(VIN_CACHE_FILE)) VIN_CACHE = JSON.parse(fs.readFileSync(VIN_CACHE_FILE, "utf8")) || {}; } catch (e) { console.error("vin cache load:", e.message); }
+function saveVinCache() { try { fs.writeFileSync(VIN_CACHE_FILE, JSON.stringify(VIN_CACHE)); } catch (e) {} }
+const VIN_TRANS = { A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,J:1,K:2,L:3,M:4,N:5,P:7,R:9,S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9,"0":0,"1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9 };
+const VIN_WEIGHTS = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+function vinFormatValid(vin) { return /^[A-HJ-NPR-Z0-9]{17}$/.test(vin); }
+function vinCheckDigitOk(vin) {
+  if (!vinFormatValid(vin)) return false;
+  let sum = 0;
+  for (let i = 0; i < 17; i++) { const c = vin[i]; if (!(c in VIN_TRANS)) return false; sum += VIN_TRANS[c] * VIN_WEIGHTS[i]; }
+  const r = sum % 11; const cd = r === 10 ? "X" : String(r);
+  return vin[8] === cd;
+}
+function vinLabel(o) {
+  const base = [o.year, o.make, o.model].filter(Boolean).join(" ");
+  const eng = o.displacement ? (o.displacement + "L" + (o.engineCyl ? " " + o.engineCyl + "-cyl" : "")) : (o.engineCyl ? o.engineCyl + "-cyl" : "");
+  const extra = [eng, o.trim || o.series, o.body].filter(Boolean).join(" · ");
+  return extra ? base + " · " + extra : base;
+}
+async function decodeVin(vinRaw) {
+  const vin = String(vinRaw || "").toUpperCase().replace(/\s+/g, "");
+  if (!vinFormatValid(vin)) return { ok: false, reason: "invalid", error: "That isn't a valid 17-character VIN." };
+  if (VIN_CACHE[vin]) return VIN_CACHE[vin];
+  let dec;
+  try {
+    dec = await fetchJson("https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/" + encodeURIComponent(vin) + "?format=json");
+  } catch (e) {
+    return { ok: false, reason: "service", error: "The VIN decoder is unavailable right now." };
+  }
+  const v = (dec && dec.Results && dec.Results[0]) || {};
+  const year = v.ModelYear, make = v.Make, model = v.Model;
+  if (!year || !make || !model) return { ok: false, reason: "notfound", error: "Couldn't decode this VIN — double-check the characters." };
+  const disp = v.DisplacementL ? Math.round(parseFloat(v.DisplacementL) * 10) / 10 : "";
+  const out = {
+    ok: true, vin, valid: vinCheckDigitOk(vin),
+    year, make, model, trim: v.Trim || "", series: v.Series || "", body: v.BodyClass || "",
+    engineCyl: v.EngineCylinders || "", displacement: (disp || disp === 0) && !Number.isNaN(disp) ? disp : "",
+    fuel: v.FuelTypePrimary || "", drive: v.DriveType || "",
+  };
+  out.vehicle = [out.year, out.make, out.model].filter(Boolean).join(" ");
+  out.label = vinLabel(out);
+  VIN_CACHE[vin] = out; saveVinCache();
+  return out;
+}
+
 let HISTORY = [];
 try {
   fs.mkdirSync(HISTORY_DIR, { recursive: true });
@@ -1846,6 +1892,13 @@ app.get("/appbrand.js", (_req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.send(APPBRAND_JS);
 });
+// Shared "Decode VIN" widget (auto-wires any [data-vin-decode] button on a page).
+const VIN_JS = fs.readFileSync(path.join(__dirname, "public", "vin.js"), "utf8");
+app.get("/vin.js", (_req, res) => {
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.send(VIN_JS);
+});
 
 // Serve a store's logo (public - logos are not sensitive). "builtin" = the
 // bundled Whiteface logo; otherwise the store's uploaded file.
@@ -2213,8 +2266,8 @@ app.post("/api/appeal", async (req, res) => {
       userName: req.ctx.user.name || req.ctx.user.email,
       type: "appeal",
       ro: extractRo(rejection + " " + ticket),
-      vin: extractVin(rejection + " " + ticket) || "",
-      vehicle: "",
+      vin: String(req.body.vin || "").trim().toUpperCase() || extractVin(rejection + " " + ticket) || "",
+      vehicle: String(req.body.vehicle || "").trim(),
       score: null,
       verdict: appeal?.analysis?.strength || "",
       summary: appeal?.analysis?.reason || "",
@@ -2286,6 +2339,12 @@ function recordFields(r) {
   if (!out.complaint && !out.cause && !out.correction && t && !/COMPLAINT:/i.test(t)) out.detail = out.detail || t.trim();
   return out;
 }
+
+// Decode a VIN on demand (the "Decode VIN" button). Cached; never in a URL.
+app.post("/api/vin", async (req, res) => {
+  try { res.json(await decodeVin((req.body && req.body.vin) || "")); }
+  catch (e) { res.status(500).json({ ok: false, reason: "service", error: "The VIN decoder is unavailable right now." }); }
+});
 
 app.post("/api/review", async (req, res) => {
   const b = req.body || {};
@@ -2375,7 +2434,9 @@ app.post("/api/review", async (req, res) => {
       mileageOut: f.mileageout || "",
       causalPart: f.causalpart || "",
       vin: vin || "",
-      vehicle: recallInfo && !recallInfo.error ? (recallInfo.year + " " + recallInfo.make + " " + recallInfo.model) : "",
+      vehicle: (recallInfo && !recallInfo.error)
+        ? (recallInfo.vehicleLabel || [recallInfo.year, recallInfo.make, recallInfo.model].filter(Boolean).join(" "))
+        : String(b.vehicle || "").trim(),
       score: review?.score ?? null,
       verdict: review?.verdict || "",
       summary: review?.summary || "",
