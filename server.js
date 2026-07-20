@@ -1839,54 +1839,7 @@ app.get("/logout", (_req, res) => {
 // Shared front-end branding + nav script for every app page. Applies the
 // store's logo/name, injects the Story/Account/Console links, and HIDES the
 // tools a store's plan doesn't include (server-side gating is the real guard).
-const APPBRAND_JS = `(function(){
-  function apply(d){
-    if(!d||!d.store)return; var st=d.store; var feat=st.features||{story:true,warranty:true};
-    var b=document.querySelector("#wordmark b"), s=document.querySelector("#wordmark small");
-    if(b)b.textContent=(st.name||"").toUpperCase(); if(s)s.textContent=(st.city||"").toUpperCase();
-    try{ if(document.title) document.title=document.title.replace(/Whiteface Ford/gi, st.name); }catch(e){}
-    var logo=document.getElementById("logo"), wm=document.getElementById("wordmark");
-    if(logo){
-      logo.onload=function(){logo.style.display="block"; if(wm)wm.style.display="none";};
-      logo.onerror=function(){logo.style.display="none"; if(wm)wm.style.display="flex";};
-      logo.alt=st.name||""; logo.src=st.logoUrl;
-    } else if(wm){ wm.style.display="flex"; }
-    try{
-      var nav=document.querySelector(".nav");
-      if(nav){
-        if(!feat.warranty){ ["/","/appeal","/history","/resources"].forEach(function(h){ var a=nav.querySelector('a[href="'+h+'"]'); if(a) a.style.display="none"; }); }
-        if((feat.warranty||feat.story) && !nav.querySelector('a[href="/reports"]')){
-          var rp=document.createElement("a"); rp.href="/reports"; rp.textContent="Reports"; rp.setAttribute("data-reports","1"); if(location.pathname==="/reports") rp.className="active";
-          var anchor=nav.querySelector('a[href="/history"]')||nav.querySelector('a[href="/logout"]');
-          if(anchor) nav.insertBefore(rp, anchor.nextSibling||null); else nav.appendChild(rp);
-        }
-        if(feat.warranty && !nav.querySelector('a[href="/insights"]')){
-          var ins=document.createElement("a"); ins.href="/insights"; ins.textContent="Insights"; ins.setAttribute("data-insights","1"); if(location.pathname==="/insights") ins.className="active";
-          var ianchor=nav.querySelector('a[href="/history"]')||nav.querySelector('a[href="/reports"]')||nav.querySelector('a[href="/logout"]');
-          if(ianchor) nav.insertBefore(ins, ianchor.nextSibling||null); else nav.appendChild(ins);
-        }
-        if(feat.story && !nav.querySelector("[data-story]")){
-          var ref=nav.querySelector('a[href="/"]');
-          var sy=document.createElement("a"); sy.href="/story"; sy.textContent="Story"; sy.setAttribute("data-story","1"); if(location.pathname==="/story") sy.className="active";
-          if(ref) nav.insertBefore(sy, ref.nextSibling||null); else nav.insertBefore(sy, nav.firstChild);
-        }
-        if(!nav.querySelector("[data-status]")){
-          var lo=nav.querySelector('a[href="/logout"]');
-          var stt=document.createElement("a"); stt.href="/status"; stt.textContent="Status"; stt.setAttribute("data-status","1"); if(location.pathname==="/status") stt.className="active";
-          var hlp=document.createElement("a"); hlp.href="/support"; hlp.textContent="Help"; hlp.setAttribute("data-help","1"); if(location.pathname==="/support") hlp.className="active";
-          if(lo){ nav.insertBefore(stt,lo); nav.insertBefore(hlp,lo); } else { nav.appendChild(stt); nav.appendChild(hlp); }
-        }
-        if(!nav.querySelector("[data-acct]")){
-          var so=nav.querySelector('a[href="/logout"]');
-          if(d.user && d.user.role==="owner"){ var con=document.createElement("a"); con.href="/console"; con.textContent="Console"; con.setAttribute("data-con","1"); if(so)nav.insertBefore(con,so); else nav.appendChild(con); }
-          var ac=document.createElement("a"); ac.href="/account"; ac.textContent="Account"; ac.setAttribute("data-acct","1"); if(location.pathname==="/account") ac.className="active"; if(so)nav.insertBefore(ac,so); else nav.appendChild(ac);
-        }
-        var homeA=document.querySelector("a.brand"); if(homeA){ homeA.href = feat.warranty ? "/" : (feat.story ? "/story" : "/account"); }
-      }
-    }catch(e){}
-  }
-  fetch("/api/me").then(function(r){return r.ok?r.json():null;}).then(apply).catch(function(){});
-})();`;
+const APPBRAND_JS = fs.readFileSync(path.join(__dirname, "public", "appbrand.js"), "utf8");
 app.get("/appbrand.js", (_req, res) => {
   res.setHeader("Content-Type", "application/javascript; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
