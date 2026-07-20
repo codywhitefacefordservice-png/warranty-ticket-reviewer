@@ -122,6 +122,39 @@
   footer{margin-top:22px;color:var(--muted);font-size:12px}
   .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
   @keyframes sp{to{transform:rotate(360deg)}}
+  /* grouped reviewer layout */
+  .rvw-grid{display:grid;grid-template-columns:1fr 320px;gap:22px;align-items:start;margin-top:4px}
+  @media(max-width:900px){.rvw-grid{grid-template-columns:1fr}}
+  .rvw-card{background:#fff;border:1px solid #e6e9f0;border-radius:14px;box-shadow:0 1px 3px rgba(16,24,40,.07),0 12px 28px -18px rgba(16,24,40,.28);overflow:hidden;margin-bottom:18px}
+  .rvw-card-h{display:flex;align-items:center;gap:11px;padding:15px 20px;border-bottom:1px solid #eef1f6}
+  .rvw-card-h .n{width:26px;height:26px;border-radius:8px;background:#eaf1fd;color:#123a86;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none}
+  .rvw-card-h h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;text-transform:none;color:#141b2b !important}
+  .rvw-card-h p{margin:2px 0 0;font-size:12.5px;color:#8a93a3;font-weight:500}
+  .rvw-card-b{padding:18px 20px}
+  .rvw-card-b .field:last-child{margin-bottom:0}
+  .rvw-row{display:grid;gap:16px}
+  .rvw-row.c2{grid-template-columns:1fr 1fr}
+  .rvw-row+.rvw-row{margin-top:16px}
+  @media(max-width:560px){.rvw-row.c2{grid-template-columns:1fr}}
+  .rvw-row .field{margin-bottom:0}
+  .rvw-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:2px 0 10px}
+  .rvw-actions .hint{flex:1;min-width:180px}
+  .rvw-rail h3{margin:0 0 3px;font-size:14px;font-weight:700;color:#141b2b}
+  .rvw-rail p{margin:0 0 14px;font-size:13px;color:#5a6577}
+  .rvw-step{display:flex;gap:12px;padding:10px 0;border-top:1px solid #eef1f6}
+  .rvw-step:first-of-type{border-top:0}
+  .rvw-step .k{width:24px;height:24px;border-radius:7px;background:#eef1f6;color:#5a6577;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none}
+  .rvw-step .t b{display:block;font-size:13.5px;color:#141b2b}
+  .rvw-step .t span{font-size:12.5px;color:#8a93a3}
+  .rvw-card.tip{background:linear-gradient(135deg,#f7faff,#eef4ff);border-color:#dce7fb}
+  .rvw-card.tip .tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#2f6bd8;margin-bottom:6px}
+  .rvw-dropzone{display:flex;align-items:center;gap:16px;border:1.5px dashed #c4cddd;border-radius:12px;padding:16px 18px;background:#fafbfe}
+  .rvw-dropzone .dz-ic{width:42px;height:42px;border-radius:11px;background:#eaf1fd;color:#123a86;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;flex:none}
+  .rvw-dropzone .dz-t{display:flex;flex-direction:column;flex:1}
+  .rvw-dropzone .dz-t b{font-size:14px;color:#141b2b}
+  .rvw-dropzone .dz-t span{font-size:12.5px;color:#8a93a3}
+  #attach.rvw-dzbtn{flex:none}
+  .rvw-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 </style>
 </head>
 <body>
@@ -146,46 +179,100 @@
 
   <div id="rerun-note" class="rerun-note" style="display:none"></div>
 
-  <div class="card" id="inputcard">
-    <div class="field"><label for="f-claimtype">Claim Type <span class="req">*</span></label>
-      <select id="f-claimtype">
-        <option value="">Select the claim type…</option>
-        <option value="11">11 — Standard vehicle warranty (NVLW)</option>
-        <option value="11-ESP">11 — ESP / service contract (Sub-Code ESP)</option>
-        <option value="21">21 — Service Part Warranty (SPW)</option>
-        <option value="31">31 — FSA / Recall</option>
-      </select>
-      <div class="hint" id="ct-hint" style="margin-top:5px"></div>
-    </div>
-    <div class="fgrid">
-      <div class="field"><label for="f-ro">Repair Order # <span class="req">*</span></label><input id="f-ro" autocomplete="off" placeholder="e.g. 771902"></div>
-      <div class="field"><label for="f-line">Line # <span class="req">*</span></label><input id="f-line" autocomplete="off" placeholder="e.g. A"></div>
-      <div class="field"><label for="f-vin">VIN <span class="req">*</span></label>
-        <div class="vinrow"><input id="f-vin" autocomplete="off" maxlength="17" placeholder="17-character VIN" style="text-transform:uppercase"><button type="button" class="vinbtn" data-vin-decode="f-vin">Decode VIN</button></div>
-        <div class="vinst idle" data-vin-status="f-vin"></div>
+  <div class="rvw-grid">
+    <div>
+      <div class="rvw-card">
+        <div class="rvw-card-h"><span class="n">1</span><div><h2>Claim details</h2><p>What kind of claim and which repair order</p></div></div>
+        <div class="rvw-card-b">
+          <div class="field"><label for="f-claimtype">Claim Type <span class="req">*</span></label>
+            <select id="f-claimtype">
+              <option value="">Select the claim type…</option>
+              <option value="11">11 — Standard vehicle warranty (NVLW)</option>
+              <option value="11-ESP">11 — ESP / service contract (Sub-Code ESP)</option>
+              <option value="21">21 — Service Part Warranty (SPW)</option>
+              <option value="31">31 — FSA / Recall</option>
+            </select>
+            <div class="hint" id="ct-hint" style="margin-top:5px"></div>
+          </div>
+          <div class="rvw-row c2" style="margin-top:16px">
+            <div class="field"><label for="f-ro">Repair Order # <span class="req">*</span></label><input id="f-ro" autocomplete="off" placeholder="e.g. 771902"></div>
+            <div class="field"><label for="f-line">Line # <span class="req">*</span></label><input id="f-line" autocomplete="off" placeholder="e.g. A"></div>
+          </div>
+          <div id="spw-fields" class="rvw-row" style="display:none;margin-top:16px">
+            <div class="field"><label for="f-origro">Original RO / Invoice # <span class="opt">(SPW)</span></label><input id="f-origro" autocomplete="off" placeholder="original RO or invoice # of the part install"></div>
+            <div class="rvw-row c2">
+              <div class="field"><label for="f-spwinstall">SPW Install Date <span class="opt">(SPW)</span></label><input id="f-spwinstall" type="date" autocomplete="off"></div>
+              <div class="field"><label for="f-spwapproval">SPW Prior Approval # <span class="opt">(SPWA — if applicable)</span></label><input id="f-spwapproval" autocomplete="off" placeholder="SPWA authorization # (e.g. SPWA12345)"></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="field"><label for="f-mileage">Mileage In <span class="req">*</span></label><input id="f-mileage" autocomplete="off" inputmode="numeric" placeholder="odometer at write-up"></div>
-      <div class="field"><label for="f-mileageout">Mileage Out <span class="req">*</span></label><input id="f-mileageout" autocomplete="off" inputmode="numeric" placeholder="odometer at completion"></div>
-      <div class="field"><label for="f-causalpart">Causal Part # <span class="req">*</span></label><input id="f-causalpart" autocomplete="off" placeholder="part number (or NPF)" style="text-transform:uppercase"></div>
+
+      <div class="rvw-card">
+        <div class="rvw-card-h"><span class="n">2</span><div><h2>Vehicle</h2><p>Decode the VIN so nothing gets missed</p></div></div>
+        <div class="rvw-card-b">
+          <div class="field"><label for="f-vin">VIN <span class="req">*</span></label>
+            <div class="vinrow"><input id="f-vin" autocomplete="off" maxlength="17" placeholder="17-character VIN" style="text-transform:uppercase"><button type="button" class="vinbtn" data-vin-decode="f-vin">Decode VIN</button></div>
+            <div class="vinst idle" data-vin-status="f-vin"></div>
+          </div>
+          <div class="rvw-row c2" style="margin-top:16px">
+            <div class="field"><label for="f-mileage">Mileage In <span class="req">*</span></label><input id="f-mileage" autocomplete="off" inputmode="numeric" placeholder="odometer at write-up"></div>
+            <div class="field"><label for="f-mileageout">Mileage Out <span class="req">*</span></label><input id="f-mileageout" autocomplete="off" inputmode="numeric" placeholder="odometer at completion"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rvw-card">
+        <div class="rvw-card-h"><span class="n">3</span><div><h2>Complaint · Cause · Correction</h2><p>The three C's — plus the causal part</p></div></div>
+        <div class="rvw-card-b">
+          <div class="field" style="max-width:300px"><label for="f-causalpart">Causal Part # <span class="req">*</span></label><input id="f-causalpart" autocomplete="off" placeholder="part number (or NPF)" style="text-transform:uppercase"></div>
+          <div class="field" style="margin-top:16px"><label for="f-complaint">Complaint — customer concern <span class="req">*</span></label><textarea id="f-complaint" class="c3" placeholder="What the customer reported."></textarea></div>
+          <div class="field"><label for="f-cause">Cause <span class="req">*</span></label><textarea id="f-cause" class="c3" placeholder="What was found to be causing it — the causal part / condition."></textarea></div>
+          <div class="field"><label for="f-correction">Correction <span class="req">*</span></label><textarea id="f-correction" class="c3" placeholder="What was done to fix it."></textarea></div>
+          <div class="field"><label for="f-detail">Additional repair-order detail <span class="opt">(optional — improves the review)</span></label><textarea id="f-detail" placeholder="Diagnosis path & test results, labor op & punch time, parts, sublet, hard-card notes… the more detail, the sharper the risk check."></textarea></div>
+        </div>
+      </div>
+
+      <div class="rvw-card">
+        <div class="rvw-card-h"><span class="n">4</span><div><h2>Documents &amp; photos</h2><p>Hard card, RO print-out, diagnostic screenshots, part photos</p></div></div>
+        <div class="rvw-card-b">
+          <div class="rvw-dropzone">
+            <span class="dz-ic">⬆</span>
+            <span class="dz-t"><b>Attach the hard card &amp; photos</b><span>Photos or a PDF of the physical RO hard card — punches, initials, signatures. Saved to History.</span></span>
+            <button id="attach" type="button" class="rvw-dzbtn">Attach hard card</button>
+          </div>
+          <div id="filelist" class="rvw-chips"></div>
+        </div>
+      </div>
+
+      <div class="rvw-actions">
+        <button id="go" class="primary">Review ticket</button>
+        <button id="clear">Clear</button>
+        <span class="hint">Reviewed against your Ford W&amp;P, OWS and ESP references.</span>
+      </div>
     </div>
-    <div id="spw-fields" class="fgrid" style="display:none">
-      <div class="field"><label for="f-origro">Original RO / Invoice # <span class="opt">(SPW)</span></label><input id="f-origro" autocomplete="off" placeholder="original RO or invoice # of the part install"></div>
-      <div class="field"><label for="f-spwinstall">SPW Install Date <span class="opt">(SPW)</span></label><input id="f-spwinstall" type="date" autocomplete="off"></div>
-      <div class="field"><label for="f-spwapproval">SPW Prior Approval # <span class="opt">(SPWA — if applicable)</span></label><input id="f-spwapproval" autocomplete="off" placeholder="SPWA authorization # (e.g. SPWA12345)"></div>
-    </div>
-    <div class="field"><label for="f-complaint">Complaint — customer concern <span class="req">*</span></label><textarea id="f-complaint" class="c3" placeholder="What the customer reported."></textarea></div>
-    <div class="field"><label for="f-cause">Cause <span class="req">*</span></label><textarea id="f-cause" class="c3" placeholder="What was found to be causing it — the causal part / condition."></textarea></div>
-    <div class="field"><label for="f-correction">Correction <span class="req">*</span></label><textarea id="f-correction" class="c3" placeholder="What was done to fix it."></textarea></div>
-    <div class="field"><label for="f-detail">Additional repair-order detail <span class="opt">(optional — improves the review)</span></label><textarea id="f-detail" placeholder="Diagnosis path & test results, labor op & punch time, parts, sublet, hard-card notes… the more detail, the sharper the risk check."></textarea></div>
+
+    <aside class="rvw-rail">
+      <div class="rvw-card">
+        <div class="rvw-card-b">
+          <h3>How this works</h3>
+          <p>Four quick sections, then a scored, claim-ready write-up.</p>
+          <div class="rvw-step"><span class="k">1</span><span class="t"><b>Claim details</b><span>Type &amp; repair order</span></span></div>
+          <div class="rvw-step"><span class="k">2</span><span class="t"><b>Vehicle</b><span>Decode the VIN</span></span></div>
+          <div class="rvw-step"><span class="k">3</span><span class="t"><b>The three C's</b><span>Complaint, cause, correction</span></span></div>
+          <div class="rvw-step"><span class="k">4</span><span class="t"><b>Documents</b><span>Hard card &amp; photos</span></span></div>
+        </div>
+      </div>
+      <div class="rvw-card tip">
+        <div class="rvw-card-b">
+          <span class="tag">Tip</span>
+          <h3>Sharper detail = fewer chargebacks</h3>
+          <p style="margin-bottom:0">The more you put in “additional detail” — labor ops, punch times, test results — the tighter the risk check.</p>
+        </div>
+      </div>
+    </aside>
   </div>
   <input type="file" id="files" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple style="display:none">
-  <div class="bar">
-    <button id="go" class="primary">Review ticket</button>
-    <button id="attach">Attach hard card</button>
-    <button id="clear">Clear</button>
-    <span class="hint">Photos or PDF of the physical RO hard card (punches, initials, signatures). Reviews are saved to History.</span>
-  </div>
-  <div id="filelist" class="bar" style="margin-top:-14px"></div>
 
   <div id="err" class="error"></div>
 
