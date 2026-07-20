@@ -38,6 +38,14 @@
   input,textarea{width:100%;padding:11px 13px;font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);resize:vertical}
   textarea{min-height:70px}
   input:focus,textarea:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
+  .vinrow{display:flex;gap:8px;align-items:center}
+  .vinrow input{flex:1;width:auto}
+  .vinbtn{padding:9px 14px;font-size:13px;font-weight:700;border:1px solid var(--brand,#003478);border-radius:8px;background:var(--brand,#003478);color:#fff;cursor:pointer;white-space:nowrap}
+  .vinbtn:hover{filter:brightness(1.1)}
+  .vinst{font-size:12.5px;margin-top:5px;font-weight:600}
+  .vinst.idle{color:#8a5a00} .vinst.load{color:var(--ink-2,#4a5568)} .vinst.ok{color:var(--good-ink,#0a8a3a)} .vinst.bad{color:var(--red,#c8102e)} .vinst.warn{color:#8a5a00}
+  .vin-ovbtn,.vin-ovuse{margin-left:6px;padding:3px 9px;font-size:11.5px;font-weight:700;border:1px solid var(--border,#d7dee8);border-radius:6px;background:var(--surface,#fff);color:var(--ink,#0e1726);cursor:pointer}
+  .vin-ovin{padding:5px 8px;font-size:12.5px;border:1px solid var(--border,#d7dee8);border-radius:6px;background:var(--surface,#fff);color:var(--ink,#0e1726)}
   .opt{color:var(--muted);text-transform:none;letter-spacing:0;font-weight:600}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,23,38,.04)}
   .bar{display:flex;gap:10px;align-items:center;margin:16px 0 8px;flex-wrap:wrap}
@@ -104,6 +112,11 @@
   <div class="page-sub">Turn your notes into a clean, dealer-grade write-up for a customer-pay repair — a professional repair-order story plus a plain-English explanation for the customer. Any vehicle, any shop.</div>
 
   <div class="card">
+    <div class="story-field">
+      <label for="s-vin">VIN <span class="opt">(optional — decode to auto-fill the vehicle)</span></label>
+      <div class="vinrow"><input id="s-vin" maxlength="17" placeholder="17-character VIN" style="text-transform:uppercase"><button type="button" class="vinbtn" data-vin-decode="s-vin" data-vin-fill="details">Decode VIN</button></div>
+      <div class="vinst idle" data-vin-status="s-vin"></div>
+    </div>
     <div class="story-field">
       <label for="details">Vehicle & details <span class="opt">(optional — year/make/model, mileage, parts used)</span></label>
       <input id="details" placeholder="e.g. 2021 F-150, 42,300 mi">
@@ -174,6 +187,8 @@ $("go").addEventListener("click", async ()=>{
   const body={ details:$("details").value.trim(), component:$("component").value.trim(), concern:$("concern").value.trim(), found:$("found").value.trim(), done:$("done").value.trim(), search:$("opt-search").checked, readings:$("opt-readings").checked };
   const err=$("err"); err.style.display="none";
   if(!body.concern||!body.found||!body.done){ err.textContent="Fill in the concern, what you found, and what you did."; err.style.display="block"; return; }
+  // If a VIN was entered, it must be decoded first (or cleared) so the step is never skipped.
+  if(window.VIN && window.VIN.needsDecode("s-vin")){ err.textContent="Decode the VIN before writing the story — press “Decode VIN” (or clear the VIN field)."; err.style.display="block"; return; }
   const btn=$("go"); btn.disabled=true; const orig=btn.textContent; btn.innerHTML='<span class="spin"></span>Writing…';
   try{
     const r=await fetch("/api/story",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
@@ -197,6 +212,7 @@ document.addEventListener("click",(e)=>{
   if(e.target.id==="copyall"){ const t="COMPLAINT: "+$("o-complaint").textContent+"\n\nCAUSE: "+$("o-cause").textContent+"\n\nCORRECTION: "+$("o-correction").textContent; copyText(t, e.target); }
 });
 </script>
+<script src="/vin.js"></script>
 <script src="/appbrand.js"></script>
 </body>
 </html>
