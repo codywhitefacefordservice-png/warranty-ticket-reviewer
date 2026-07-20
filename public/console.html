@@ -7,137 +7,222 @@
 <title>Owner Console — ClaimProof</title>
 <style>
   :root{
-    color-scheme: light dark;
-    --brand:#12294d; --brand-2:#2f80ed; --accent:#2f80ed;
-    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
-    --grid:#e3e8ef; --border:#d7dee8; --good:#0a8a3a; --bad:#c8102e;
+    --bg:#f4f6f9;--surface:#fff;--ink:#141b2b;--ink-2:#5a6577;--ink-3:#8a93a3;
+    --line:#e6e9f0;--line-2:#eef1f6;--brand:#123a86;--brand-2:#2f6bd8;--brand-tint:#eaf1fd;
+    --good:#0d8a4f;--good-tint:#e6f6ee;--warn:#b7791f;--warn-tint:#fbf1dd;--danger:#c8102e;--danger-tint:#fdecee;
+    --radius:14px;--radius-sm:10px;
+    --shadow-card:0 1px 3px rgba(16,24,40,.07),0 12px 28px -18px rgba(16,24,40,.28);
+    --shadow-pop:0 8px 30px -8px rgba(16,24,40,.25);
   }
-  @media (prefers-color-scheme: dark){
-    :root{ --brand:#2b527f; --brand-2:#5b8def;
-      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
-      --grid:#242c38; --border:#2b3442; --good:#38c172; --bad:#ef5a6f; }
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-  .topbar{background:#fff;border-bottom:3px solid var(--brand)}
-  .accent{height:2px;background:var(--accent)}
-  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
-  .topbar svg{height:44px;width:auto;display:block}
-  .nav a{color:var(--ink-2);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px}
-  .nav a:hover{color:var(--brand-2)}
-  .wrap{max-width:1040px;margin:0 auto;padding:22px 16px 64px}
-  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px}
-  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
-  h2{font-size:14px;margin:0 0 12px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--brand)}
-  @media (prefers-color-scheme: dark){ h2{color:var(--brand-2)} }
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,23,38,.04)}
-  label{display:block;font-size:11.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 5px}
-  input,select{width:100%;padding:9px 12px;font-size:14.5px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
-  input:focus,select:focus{outline:2px solid var(--brand-2);outline-offset:1px;border-color:transparent}
-  .row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  @media(max-width:640px){ .row{grid-template-columns:1fr} }
-  button{padding:10px 18px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(16,23,38,.06)}
-  button:hover{border-color:var(--brand-2)}
-  button.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(18,41,77,.28)}
-  button.primary:hover{filter:brightness(1.12)}
-  button.mini{padding:5px 11px;font-size:12px;font-weight:700}
-  .store{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:var(--surface)}
-  .store-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  .store-logo{width:56px;height:56px;border:1px solid var(--grid);border-radius:8px;object-fit:contain;background:#fff;flex:none}
-  .store-name{font-weight:800;font-size:16px}
-  .store-meta{color:var(--ink-2);font-size:12.5px}
-  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
-  .pill.on{color:var(--good);background:rgba(10,138,58,.12)} .pill.off{color:var(--bad);background:rgba(200,16,46,.12)}
-  .spacer{flex:1}
-  .sub{margin-top:12px;border-top:1px solid var(--grid);padding-top:12px}
+  *{box-sizing:border-box}html,body{margin:0}
+  body{background:radial-gradient(1100px 460px at 82% -220px,rgba(47,107,216,.09),transparent 60%),var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+
+  .topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--line)}
+  .topbar-in{max-width:1180px;margin:0 auto;padding:0 22px;height:62px;display:flex;align-items:center;gap:20px}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}
+  .brand svg{height:38px;width:auto;display:block}
+  .brand .sub{font-size:10.5px;font-weight:800;letter-spacing:.12em;color:var(--ink-3);text-transform:uppercase;border-left:1px solid var(--line);padding-left:10px}
+  .top-sp{flex:1}
+  .top-right{display:flex;align-items:center;gap:10px}
+  .backlink{font-size:13.5px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:8px 12px;border-radius:9px}
+  .backlink:hover{background:var(--line-2);color:var(--ink)}
+  .ownerpill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--brand-tint);color:var(--brand);font-size:12.5px;font-weight:700;border:1px solid rgba(47,107,216,.2)}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 80px}
+  .page-title{margin:0 0 5px;font-size:24px;font-weight:800;letter-spacing:-.02em}
+  .page-sub{margin:0 0 20px;color:var(--ink-2);font-size:14.5px;max-width:720px}
+
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow-x:auto}
+  .tabs button{appearance:none;border:0;background:transparent;font-family:inherit;font-size:14px;font-weight:700;color:var(--ink-2);padding:11px 15px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .tabs button:hover{color:var(--ink)}
+  .tabs button.on{color:var(--brand);border-bottom-color:var(--brand)}
+  .tabs .count{background:var(--line-2);color:var(--ink-2);border-radius:999px;font-size:11px;font-weight:800;padding:1px 8px}
+  .tabs button.on .count{background:var(--brand-tint);color:var(--brand)}
+  .tabs .count.alert{background:var(--danger-tint);color:var(--danger)}
+  .view{display:none}.view.on{display:block}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}
+  @media(max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+  .stat .lab{font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:8px}
+  .stat .lab .i{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;margin:10px 0 2px}
+  .stat .sub{font-size:12.5px;color:var(--ink-2);font-weight:600}
+  .i.blue{background:var(--brand-tint);color:var(--brand)}.i.green{background:var(--good-tint);color:var(--good)}
+  .i.amber{background:var(--warn-tint);color:var(--warn)}.i.red{background:var(--danger-tint);color:var(--danger)}
+  .up{color:var(--good)}.muted{color:var(--ink-3)}
+
+  .cols{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start}
+  @media(max-width:920px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden;margin-bottom:18px}
+  .card-h{padding:15px 20px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:10px}
+  .card-h h2{margin:0;font-size:15px;font-weight:700;color:var(--ink)}
+  .card-h .sp{flex:1}
+  .card-b{padding:18px 20px}
+
+  .btn{appearance:none;font-family:inherit;font-weight:700;cursor:pointer;border-radius:var(--radius-sm);padding:9px 14px;font-size:13.5px;border:1px solid var(--line);background:#fff;color:var(--ink);transition:.13s;white-space:nowrap}
+  .btn:hover{border-color:#cdd4e0;box-shadow:0 1px 2px rgba(16,24,40,.08)}
+  .btn.brand{background:var(--brand);border-color:var(--brand);color:#fff}
+  .btn.brand:hover{background:#0f337a}
+  .btn.sm{padding:6px 11px;font-size:12.5px}
+  .btn:disabled{opacity:.55;cursor:wait}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.02em;text-transform:uppercase}
+  .pill.on{color:var(--good);background:var(--good-tint)}.pill.off{color:var(--danger);background:var(--danger-tint)}
+  .pill.open{color:var(--warn);background:var(--warn-tint)}
+  .pill .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+
   table{width:100%;border-collapse:collapse;font-size:13.5px}
-  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--grid)}
-  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
-  .msg{font-size:13px;margin-top:8px;min-height:18px}
-  .msg.err{color:var(--bad)} .msg.ok{color:var(--good)}
-  .hint{color:var(--muted);font-size:12px}
-  details summary{cursor:pointer;font-weight:700;color:var(--brand-2);font-size:13px;margin-top:6px}
-  .fine{color:var(--muted);font-size:12px;margin-top:22px}
-  .plan{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
-  .plan-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
-  .pill-btn{border-radius:20px}
-  .pill-btn.is-on{background:rgba(10,138,58,.12);border-color:rgba(10,138,58,.45);color:var(--good)}
-  .rule{display:flex;align-items:flex-start;gap:12px;padding:10px 2px;border-bottom:1px solid var(--grid)}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line-2)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);font-weight:800}
+  tr:last-child td{border-bottom:0}
+
+  .field label,label{display:block;font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-2);margin:0 0 6px}
+  .hint{font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-3);font-size:12px}
+  input,select{width:100%;padding:10px 12px;border:1px solid #d9dee8;border-radius:var(--radius-sm);background:#fff;color:var(--ink);font:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(47,107,216,.16)}
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:640px){.row3{grid-template-columns:1fr}}
+  .msg{font-size:13px;margin-top:10px;min-height:16px}
+  .msg.err{color:var(--danger)}.msg.ok{color:var(--good)}
+
+  /* store card */
+  .store{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-card)}
+  .store-head{display:flex;align-items:center;gap:14px;padding:16px 18px}
+  .store-logo{width:48px;height:48px;border-radius:11px;border:1px solid var(--line);object-fit:contain;background:#fff;flex:none}
+  .store-name{font-weight:800;font-size:16px}
+  .store-meta{color:var(--ink-3);font-size:12.5px;margin-top:1px}
+  .store-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .plans{display:flex;gap:8px;padding:0 18px 14px;flex-wrap:wrap;align-items:center}
+  .plan-lab{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)}
+  .plan-btn{border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;color:var(--ink-2);background:#fff;cursor:pointer}
+  .plan-btn.on{background:var(--good-tint);border-color:rgba(13,138,79,.35);color:var(--good)}
+  .store-body{border-top:1px solid var(--line-2);background:#fbfcfe;padding:16px 18px}
+  .sub-tools{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  details summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--brand-2);list-style:none;padding:7px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;display:inline-block}
+  details summary::-webkit-details-marker{display:none}
+  details[open] summary{background:var(--brand-tint);border-color:rgba(47,107,216,.3)}
+  details .inner{padding:14px 2px 4px}
+
+  /* support */
+  .sup{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+  .sup:last-child{margin-bottom:0}
+  .sup.res{opacity:.6}
+  .sup-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sup-cat{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--brand-2)}
+  .sup-when{margin-left:auto;font-size:12px;color:var(--ink-3)}
+  .sup-subj{font-weight:700;margin:8px 0 3px}
+  .sup-msg{font-size:13.5px;color:var(--ink-2);white-space:pre-wrap;line-height:1.5}
+  .sup-who{font-size:12px;color:var(--ink-3);margin-top:8px}
+  .sup-who a{color:var(--brand-2)}
+
+  /* toggles + modal */
+  .rule{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-2)}
   .rule:last-child{border-bottom:0}
-  .rule .info{flex:1}
-  .rule .rl{font-weight:700;font-size:13.5px}
-  .rule .rd{color:var(--ink-2);font-size:12.5px;margin-top:2px}
-  .badge2{display:inline-block;margin-left:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#b7791f;background:rgba(183,121,31,.14);border-radius:20px;padding:1px 7px;vertical-align:1px}
-  .sw{position:relative;width:44px;height:24px;flex:none;cursor:pointer;display:inline-block}
+  .rule .info{flex:1}.rule .rl{font-weight:700;font-size:13.5px}.rule .rd{color:var(--ink-3);font-size:12.5px;margin-top:2px}
+  .sw{position:relative;width:42px;height:24px;flex:none;cursor:pointer;display:inline-block}
   .sw input{opacity:0;width:0;height:0;position:absolute}
-  .sw .tr{position:absolute;inset:0;background:#c3ccd8;border-radius:24px;transition:.15s}
+  .sw .tr{position:absolute;inset:0;background:#cfd6e2;border-radius:24px;transition:.15s}
   .sw .kn{position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
-  .sw input:checked ~ .tr{background:var(--good)}
-  .sw input:checked ~ .kn{transform:translateX(20px)}
-  .modal{position:fixed;inset:0;background:rgba(8,14,26,.55);display:none;place-items:center;z-index:50;padding:16px}
+  .sw input:checked ~ .tr{background:var(--good)}.sw input:checked ~ .kn{transform:translateX(18px)}
+  .badge2{display:inline-block;margin-left:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--warn);background:var(--warn-tint);border-radius:20px;padding:1px 7px;vertical-align:2px}
+  .modal{position:fixed;inset:0;background:rgba(8,14,26,.55);display:none;place-items:center;z-index:80;padding:16px}
   .modal.on{display:grid}
-  .modal .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;max-width:460px;padding:22px 24px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
-  .modal h3{margin:0 0 10px;font-size:16px;color:var(--bad)}
+  .modal .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;max-width:460px;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.4)}
+  .modal h3{margin:0 0 10px;font-size:16px;color:var(--danger)}
   .modal p{font-size:14px;color:var(--ink);margin:0 0 8px}
   .modal .sub2{color:var(--ink-2);font-size:13px}
   .modal .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
-  .modal .danger{background:var(--bad);border-color:var(--bad);color:#fff}
-  #sup-count{font-size:11px;font-weight:800;color:#fff;background:var(--bad,#c8102e);border-radius:999px;padding:2px 8px;margin-left:6px;display:none}
-  .sup-item{border:1px solid var(--border,#d7dee8);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:var(--surface,#fff)}
-  .sup-item.resolved{opacity:.55}
-  .sup-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .sup-cat{font-weight:800;color:var(--brand-2,#0a4bb3);text-transform:uppercase;letter-spacing:.03em;font-size:11px}
-  .sup-when{font-size:12px;color:var(--muted,#8a94a6);margin-left:auto}
-  .sup-subj{font-weight:700;margin:7px 0 3px}
-  .sup-msg{font-size:13.5px;white-space:pre-wrap;line-height:1.5}
-  .sup-who{font-size:12px;color:var(--muted,#8a94a6);margin-top:7px}
-  .sup-who a{color:var(--brand-2,#0a4bb3)}
-  .sup-item .mini{margin-top:9px}
+  .modal .danger{background:var(--danger);border-color:var(--danger);color:#fff}
+  .empty{color:var(--ink-3);font-size:13.5px;padding:6px 2px}
+  .fine{color:var(--ink-3);font-size:12.5px;margin-top:24px}
 </style>
 </head>
 <body>
 <div class="topbar"><div class="topbar-in">
-  <svg viewBox="0 0 560 150" aria-label="ClaimProof">
-    <defs><linearGradient id="cpShield" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f80ed"/><stop offset="1" stop-color="#1b56b0"/></linearGradient></defs>
-    <path d="M62 10 L110 28 L110 76 C110 106 88 126 62 140 C36 126 14 106 14 76 L14 28 Z" fill="#12294d"/>
-    <path d="M62 18 L103 33 L103 75 C103 101 84 118 62 130 C40 118 21 101 21 75 L21 33 Z" fill="url(#cpShield)"/>
-    <rect x="35" y="41" width="42" height="52" rx="5" fill="#fff"/>
-    <rect x="42" y="52" width="28" height="5" rx="2.5" fill="#12294d"/>
-    <rect x="42" y="63" width="28" height="5" rx="2.5" fill="#2f80ed"/>
-    <rect x="42" y="74" width="20" height="5" rx="2.5" fill="#12294d"/>
-    <path d="M34 78 L52 96 L96 34" fill="none" stroke="#2f80ed" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="140" y="82" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="62" font-weight="800" letter-spacing="-1"><tspan fill="#12294d">Claim</tspan><tspan fill="#2f80ed">Proof</tspan></text>
-    <rect x="142" y="98" width="404" height="3" rx="1.5" fill="#2f80ed"/>
-    <text x="144" y="126" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="23" font-weight="600" fill="#1c3a5e">Stronger Claims. Fewer chargebacks.</text>
-  </svg>
-  <nav class="nav"><a href="/">Reviewer</a><a href="/status">Status</a><a href="/support">Help</a><a href="/logout">Sign out</a></nav>
+  <a class="brand" href="/">
+    <svg viewBox="0 0 560 150" aria-label="ClaimProof">
+      <defs><linearGradient id="cpShield" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f80ed"/><stop offset="1" stop-color="#1b56b0"/></linearGradient></defs>
+      <path d="M62 10 L110 28 L110 76 C110 106 88 126 62 140 C36 126 14 106 14 76 L14 28 Z" fill="#12294d"/>
+      <path d="M62 18 L103 33 L103 75 C103 101 84 118 62 130 C40 118 21 101 21 75 L21 33 Z" fill="url(#cpShield)"/>
+      <rect x="35" y="41" width="42" height="52" rx="5" fill="#fff"/>
+      <rect x="42" y="52" width="28" height="5" rx="2.5" fill="#12294d"/>
+      <rect x="42" y="63" width="28" height="5" rx="2.5" fill="#2f80ed"/>
+      <rect x="42" y="74" width="20" height="5" rx="2.5" fill="#12294d"/>
+      <path d="M34 78 L52 96 L96 34" fill="none" stroke="#2f80ed" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="140" y="82" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="62" font-weight="800" letter-spacing="-1"><tspan fill="#12294d">Claim</tspan><tspan fill="#2f80ed">Proof</tspan></text>
+      <rect x="142" y="98" width="404" height="3" rx="1.5" fill="#2f80ed"/>
+      <text x="144" y="126" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="23" font-weight="600" fill="#1c3a5e">Stronger Claims. Fewer chargebacks.</text>
+    </svg>
+    <span class="sub">Owner Console</span>
+  </a>
+  <div class="top-sp"></div>
+  <div class="top-right">
+    <a class="backlink" href="/">← Back to app</a>
+    <span class="ownerpill">👑 Owner</span>
+  </div>
 </div></div>
-<div class="accent"></div>
 
 <div class="wrap">
   <div class="page-title">Owner Console</div>
-  <div class="page-sub">Add dealerships, give each its own logo and advisor logins, and switch access on or off. Each store only ever sees its own claims.</div>
+  <div class="page-sub">Add dealerships, give each its own logo and advisor logins, switch access on or off, and keep an eye on support. Each store only ever sees its own claims.</div>
 
-  <div class="card" id="supportcard">
-    <h2>Support inbox <span id="sup-count"></span></h2>
-    <div id="sup-list" class="hint">Loading…</div>
+  <div class="tabs">
+    <button class="on" data-tab="ov">Overview</button>
+    <button data-tab="st">Stores <span class="count" id="tab-stores">0</span></button>
+    <button data-tab="sp">Support <span class="count" id="tab-support">0</span></button>
+    <button data-tab="se">Settings</button>
   </div>
 
-  <div class="card">
-    <h2>Add a store</h2>
-    <div class="row">
-      <div><label>Dealership name</label><input id="ns-name" placeholder="e.g. Bravo Ford"></div>
-      <div><label>City / location</label><input id="ns-city" placeholder="e.g. Amarillo, TX"></div>
-      <div><label>Login slug <span class="hint">(optional)</span></label><input id="ns-slug" placeholder="auto from name"></div>
+  <!-- OVERVIEW -->
+  <div class="view on" id="ov">
+    <div class="stats" id="stats"></div>
+    <div class="cols">
+      <div>
+        <div class="card">
+          <div class="card-h"><h2>Plan mix</h2><div class="sp"></div><span class="muted" style="font-size:12.5px">tools enabled per store</span></div>
+          <div class="card-b" id="planmix"><div class="empty">Loading…</div></div>
+        </div>
+      </div>
+      <aside>
+        <div class="card">
+          <div class="card-h"><h2>Support inbox</h2><div class="sp"></div><span id="ov-sup-pill"></span></div>
+          <div class="card-b" id="ov-support" style="padding-top:12px"><div class="empty">Loading…</div></div>
+        </div>
+      </aside>
     </div>
-    <div style="margin-top:12px"><button class="primary" id="ns-add">Create store</button></div>
-    <div class="msg" id="ns-msg"></div>
   </div>
 
-  <h2 style="margin-top:8px">Stores</h2>
-  <div id="stores"></div>
+  <!-- STORES -->
+  <div class="view" id="st">
+    <div class="card">
+      <div class="card-h"><h2>Add a store</h2></div>
+      <div class="card-b">
+        <div class="row3">
+          <div class="field"><label>Dealership name</label><input id="ns-name" placeholder="e.g. Bravo Ford"></div>
+          <div class="field"><label>City / location</label><input id="ns-city" placeholder="e.g. Amarillo, TX"></div>
+          <div class="field"><label>Login slug <span class="hint">(optional)</span></label><input id="ns-slug" placeholder="auto from name"></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn brand" id="ns-add">Create store</button></div>
+        <div class="msg" id="ns-msg"></div>
+      </div>
+    </div>
+    <div id="stores"></div>
+    <div class="fine">Passwords are stored only as secure hashes. Billing (subscriptions) is set up separately.</div>
+  </div>
 
-  <div class="fine">ClaimProof — Owner Console. Passwords are stored only as secure hashes. Billing (subscriptions) is set up separately.</div>
+  <!-- SUPPORT -->
+  <div class="view" id="sp">
+    <div class="card">
+      <div class="card-h"><h2>Support inbox</h2><div class="sp"></div><span id="sp-pill"></span></div>
+      <div class="card-b" id="sup-list"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="view" id="se">
+    <div class="card"><div class="card-b" style="color:var(--ink-2)">Account-level settings (billing contact, default grading rules for new stores, branding) will live here — kept separate so day-to-day store management stays clean.</div></div>
+  </div>
 </div>
 
 <div class="modal" id="rmodal">
@@ -146,8 +231,8 @@
     <p id="rmodal-text"></p>
     <p class="sub2">Turning this off can cause claim issues. With it off, ClaimProof cannot guarantee the grading quality on affected claims for this store.</p>
     <div class="acts">
-      <button id="rmodal-cancel">Cancel</button>
-      <button class="danger" id="rmodal-ok">I understand, turn it off</button>
+      <button class="btn" id="rmodal-cancel">Cancel</button>
+      <button class="btn danger" id="rmodal-ok">I understand, turn it off</button>
     </div>
   </div>
 </div>
@@ -156,25 +241,80 @@
 const $ = (s,el)=> (el||document).querySelector(s);
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 let DATA = {stores:[], users:[]};
+let SUPPORT = [];
+
+/* ---- tabs ---- */
+document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
+  $("#"+b.dataset.tab).classList.add("on");
+  window.scrollTo({top:0,behavior:"smooth"});
+}));
 
 async function load(){
   const r = await fetch("/api/owner/stores");
-  if(r.status===403){ document.body.innerHTML="<p style='padding:40px;text-align:center'>Owner access only. <a href='/'>Back to reviewer</a></p>"; return; }
+  if(r.status===403){ document.body.innerHTML="<p style='padding:60px;text-align:center'>Owner access only. <a href='/'>Back to reviewer</a></p>"; return; }
   if(!r.ok){ return; }
   DATA = await r.json();
   render();
 }
 function usersFor(id){ return DATA.users.filter(u=>u.storeId===id); }
+
 function render(){
+  renderStores();
+  renderOverview();
+  $("#tab-stores").textContent = DATA.stores.length;
+}
+
+function renderOverview(){
+  const stores = DATA.stores, users = DATA.users;
+  const active = stores.filter(s=>s.active).length;
+  const advisors = users.filter(u=>u.role!=="owner").length;
+  const withTool = stores.filter(s=>s.features && (s.features.warranty||s.features.story)).length;
+  const openSup = SUPPORT.filter(i=>i.status!=="resolved").length;
+  $("#stats").innerHTML = `
+    <div class="stat"><div class="lab"><span class="i blue">🏢</span> Stores</div><div class="big">${stores.length}</div><div class="sub">${active} active · ${stores.length-active} inactive</div></div>
+    <div class="stat"><div class="lab"><span class="i green">👥</span> Advisors</div><div class="big">${advisors}</div><div class="sub">across all dealerships</div></div>
+    <div class="stat"><div class="lab"><span class="i amber">🧩</span> Tools enabled</div><div class="big">${withTool}</div><div class="sub">store(s) with a live tool</div></div>
+    <div class="stat"><div class="lab"><span class="i red">✉️</span> Open support</div><div class="big">${openSup}</div><div class="sub">${SUPPORT.length} total request(s)</div></div>`;
+
+  // plan mix table
+  if(!stores.length){ $("#planmix").innerHTML = "<div class='empty'>No stores yet — add one from the Stores tab.</div>"; }
+  else {
+    $("#planmix").innerHTML = `<table><thead><tr><th>Store</th><th>Warranty tools</th><th>Repair Story</th><th>Status</th></tr></thead><tbody>`+
+      stores.map(s=>{
+        const f=s.features||{};
+        const p=(on)=>`<span class="pill ${on?'on':'off'}"><span class="d"></span>${on?'on':'off'}</span>`;
+        return `<tr><td><b>${esc(s.name)}</b></td><td>${p(!!f.warranty)}</td><td>${p(!!f.story)}</td><td><span class="pill ${s.active?'on':'off'}">${s.active?'active':'inactive'}</span></td></tr>`;
+      }).join("")+`</tbody></table>`;
+  }
+  renderOverviewSupport();
+}
+
+function renderOverviewSupport(){
+  const open = SUPPORT.filter(i=>i.status!=="resolved");
+  const pill = open.length ? `<span class="pill open">${open.length} open</span>` : `<span class="pill on">clear</span>`;
+  $("#ov-sup-pill").innerHTML = pill;
+  if(!SUPPORT.length){ $("#ov-support").innerHTML = "<div class='empty'>No support requests yet.</div>"; return; }
+  const items = (open.length?open:SUPPORT).slice(0,3);
+  $("#ov-support").innerHTML = items.map(i=>{
+    let when=i.ts; try{ when=new Date(i.ts).toLocaleDateString(); }catch(e){}
+    return `<div class="sup"><div class="sup-top"><span class="sup-cat">${esc(i.category||'Question')}</span><span class="pill ${i.status==='resolved'?'off':'open'}">${i.status==='resolved'?'resolved':'open'}</span><span class="sup-when">${esc(when)}</span></div>${i.subject?`<div class="sup-subj">${esc(i.subject)}</div>`:''}<div class="sup-who">${esc(i.userName||'')} · ${esc(i.storeName||'')}</div></div>`;
+  }).join("")+`<button class="btn sm" style="width:100%;margin-top:4px" onclick="document.querySelector('.tabs button[data-tab=&quot;sp&quot;]').click()">Open support inbox →</button>`;
+}
+
+function renderStores(){
   const wrap = $("#stores");
-  if(!DATA.stores.length){ wrap.innerHTML="<div class='card hint'>No stores yet — add one above.</div>"; return; }
+  if(!DATA.stores.length){ wrap.innerHTML="<div class='card'><div class='card-b empty'>No stores yet — add one above.</div></div>"; return; }
   wrap.innerHTML = DATA.stores.map(s=>{
     const us = usersFor(s.id);
+    const f = s.features||{};
     const rows = us.map(u=>`<tr>
         <td>${esc(u.name||"—")}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td>
         <td><span class="pill ${u.active?'on':'off'}">${u.active?'active':'off'}</span></td>
-        <td style="text-align:right">${u.mfa?`<button class="mini" data-mfareset="${u.id}" data-name="${esc(u.name||u.email)}" title="Clears this user's authenticator so they re-enroll at next sign-in">Reset MFA</button> `:''}${u.role==='owner'?'':`<button class="mini" data-uact="${u.id}" data-to="${u.active?0:1}">${u.active?'Deactivate':'Activate'}</button>`}</td>
-      </tr>`).join("") || `<tr><td colspan="5" class="hint">No users yet.</td></tr>`;
+        <td style="text-align:right">${u.mfa?`<button class="btn sm" data-mfareset="${u.id}" data-name="${esc(u.name||u.email)}" title="Clears this user's authenticator so they re-enroll at next sign-in">Reset MFA</button> `:''}${u.role==='owner'?'':`<button class="btn sm" data-uact="${u.id}" data-to="${u.active?0:1}">${u.active?'Deactivate':'Activate'}</button>`}</td>
+      </tr>`).join("") || `<tr><td colspan="5" class="empty">No users yet.</td></tr>`;
     return `<div class="store">
       <div class="store-head">
         <img class="store-logo" src="/store-logo/${s.id}?v=${Date.now()}" onerror="this.style.visibility='hidden'">
@@ -182,45 +322,42 @@ function render(){
           <div class="store-name">${esc(s.name)}</div>
           <div class="store-meta">${esc(s.city||"")} · /s/${esc(s.slug)} · ${s.users} user(s)</div>
         </div>
-        <span class="pill ${s.active?'on':'off'}">${s.active?'active':'inactive'}</span>
-        <div class="spacer"></div>
-        <button class="mini" data-sact="${s.id}" data-to="${s.active?0:1}">${s.active?'Deactivate':'Activate'}</button>
-        <label class="mini" style="display:inline-block;margin:0">
-          <button class="mini" type="button" data-logobtn="${s.id}">Upload logo</button>
-          <input type="file" accept="image/png,image/jpeg,image/webp" data-logo="${s.id}" style="display:none">
-        </label>
+        <div class="store-actions">
+          <span class="pill ${s.active?'on':'off'}"><span class="d"></span>${s.active?'active':'inactive'}</span>
+          <label style="margin:0"><button class="btn sm" type="button" data-logobtn="${s.id}">Upload logo</button><input type="file" accept="image/png,image/jpeg,image/webp" data-logo="${s.id}" style="display:none"></label>
+          <button class="btn sm" data-sact="${s.id}" data-to="${s.active?0:1}">${s.active?'Deactivate':'Activate'}</button>
+        </div>
       </div>
-      <div class="plan">
-        <span class="plan-label">Plan / subscription:</span>
-        <button class="mini pill-btn ${s.features&&s.features.story?'is-on':''}" data-feat="story" data-sid="${s.id}" data-to="${s.features&&s.features.story?0:1}">Repair Story ${s.features&&s.features.story?'✓':'—'}</button>
-        <button class="mini pill-btn ${s.features&&s.features.warranty?'is-on':''}" data-feat="warranty" data-sid="${s.id}" data-to="${s.features&&s.features.warranty?0:1}">Warranty tools ${s.features&&s.features.warranty?'✓':'—'}</button>
-        <span class="hint">Off means the tool is blocked server-side — the shop can't reach it.</span>
+      <div class="plans">
+        <span class="plan-lab">Plan:</span>
+        <button class="plan-btn ${f.story?'on':''}" data-feat="story" data-sid="${s.id}" data-to="${f.story?0:1}">Repair Story ${f.story?'✓':'—'}</button>
+        <button class="plan-btn ${f.warranty?'on':''}" data-feat="warranty" data-sid="${s.id}" data-to="${f.warranty?0:1}">Warranty tools ${f.warranty?'✓':'—'}</button>
+        <span class="hint" style="margin-left:4px">Off blocks the tool server-side — the shop can't reach it.</span>
       </div>
-      <div class="sub">
+      <div class="store-body">
         <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-        <details>
-          <summary>Add a user to ${esc(s.name)}</summary>
-          <div class="row" style="margin-top:10px">
-            <div><label>Name</label><input data-nu-name="${s.id}" placeholder="Advisor name"></div>
-            <div><label>Email</label><input data-nu-email="${s.id}" placeholder="advisor@store.com"></div>
-            <div><label>Temp password</label><input data-nu-pass="${s.id}" placeholder="they can change later"></div>
-          </div>
-          <div class="row" style="margin-top:10px">
-            <div><label>Role</label><select data-nu-role="${s.id}"><option value="advisor">Advisor</option><option value="admin">Store admin</option></select></div>
-          </div>
-          <div style="margin-top:12px"><button class="primary" data-nu-add="${s.id}">Add user</button></div>
-          <div class="msg" data-nu-msg="${s.id}"></div>
-        </details>
-        <details data-rules-wrap="${s.id}">
-          <summary>Grading rules for ${esc(s.name)}</summary>
-          <div class="hint" style="margin:8px 0 4px">Turn ClaimProof's grading rules on or off for this store only — no other store is affected. Turning a safeguard off shows a warning first.</div>
-          <div data-rules="${s.id}"><span class="hint">Loading…</span></div>
-        </details>
+        <div class="sub-tools">
+          <details><summary>＋ Add a user</summary><div class="inner">
+            <div class="row3">
+              <div class="field"><label>Name</label><input data-nu-name="${s.id}" placeholder="Advisor name"></div>
+              <div class="field"><label>Email</label><input data-nu-email="${s.id}" placeholder="advisor@store.com"></div>
+              <div class="field"><label>Temp password</label><input data-nu-pass="${s.id}" placeholder="they can change later"></div>
+            </div>
+            <div style="margin-top:12px;max-width:220px"><label>Role</label><select data-nu-role="${s.id}"><option value="advisor">Advisor</option><option value="admin">Store admin</option></select></div>
+            <div style="margin-top:12px"><button class="btn brand" data-nu-add="${s.id}">Add user</button></div>
+            <div class="msg" data-nu-msg="${s.id}"></div>
+          </div></details>
+          <details data-rules-wrap="${s.id}"><summary>⚙ Grading rules</summary><div class="inner">
+            <div class="hint" style="margin-bottom:8px">Turn ClaimProof's grading rules on or off for this store only — no other store is affected. Turning a safeguard off shows a warning first.</div>
+            <div data-rules="${s.id}"><span class="empty">Loading…</span></div>
+          </div></details>
+        </div>
       </div>
     </div>`;
   }).join("");
   wire();
 }
+
 function wire(){
   document.querySelectorAll("[data-logobtn]").forEach(b=>b.onclick=()=>{ document.querySelector(`input[data-logo="${b.dataset.logobtn}"]`).click(); });
   document.querySelectorAll("input[data-logo]").forEach(inp=>inp.onchange=async()=>{
@@ -287,9 +424,7 @@ function onToggle(inp){
     PENDING={inp,sid,key,next};
     $("#rmodal-text").textContent='Turn off "'+meta.label+'" for this store?';
     $("#rmodal").classList.add("on");
-  } else {
-    saveRule(sid,key,next,false,inp);
-  }
+  } else { saveRule(sid,key,next,false,inp); }
 }
 async function saveRule(sid,key,enabled,ack,inp){
   const r=await fetch(`/api/owner/stores/${sid}/rules`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key,enabled,ack})});
@@ -298,6 +433,7 @@ async function saveRule(sid,key,enabled,ack,inp){
 }
 $("#rmodal-cancel").onclick=()=>{ if(PENDING){ PENDING.inp.checked=!PENDING.next; } $("#rmodal").classList.remove("on"); PENDING=null; };
 $("#rmodal-ok").onclick=async()=>{ if(!PENDING)return; const p=PENDING; PENDING=null; $("#rmodal").classList.remove("on"); await saveRule(p.sid,p.key,p.next,true,p.inp); };
+
 $("#ns-add").onclick=async()=>{
   const name=$("#ns-name").value.trim(), city=$("#ns-city").value.trim(), slug=$("#ns-slug").value.trim();
   const m=$("#ns-msg");
@@ -307,32 +443,36 @@ $("#ns-add").onclick=async()=>{
   if(r.ok){ m.className="msg ok"; m.textContent="Store created."; $("#ns-name").value=$("#ns-city").value=$("#ns-slug").value=""; load(); }
   else { m.className="msg err"; m.textContent=d.error||"Could not create store."; }
 };
-load();
 
-// --- Support inbox ---
+/* ---- support ---- */
 async function loadSupport(){
-  const wrap=$("#sup-list"), badge=$("#sup-count");
   try{
     const r=await fetch("/api/support");
-    if(!r.ok){ wrap.innerHTML="<span class='hint'>Couldn't load support requests.</span>"; return; }
-    const d=await r.json(); const items=d.items||[];
-    const open=items.filter(i=>i.status!=="resolved").length;
-    if(open>0){ badge.style.display="inline-block"; badge.textContent=open+" open"; } else { badge.style.display="none"; }
-    if(!items.length){ wrap.innerHTML="<span class='hint'>No support requests yet. When a store sends one from the Help page, it shows up here.</span>"; return; }
-    wrap.innerHTML=items.map(i=>{
-      const resolved=i.status==="resolved";
-      let when=i.ts; try{ when=new Date(i.ts).toLocaleString(); }catch(e){}
-      return `<div class="sup-item ${resolved?'resolved':''}">
-        <div class="sup-top"><span class="sup-cat">${esc(i.category||'Question')}</span>
-        <span class="pill ${resolved?'off':'on'}">${resolved?'resolved':'open'}</span>
-        <span class="sup-when">${esc(when)}</span></div>
-        ${i.subject?`<div class="sup-subj">${esc(i.subject)}</div>`:''}
-        <div class="sup-msg">${esc(i.message||'')}</div>
-        <div class="sup-who">${esc(i.userName||'')} &middot; ${esc(i.storeName||'')} &middot; <a href="mailto:${esc(i.userEmail||'')}">${esc(i.userEmail||'')}</a></div>
-        <button class="mini" data-sup="${esc(i.id)}" data-to="${resolved?'open':'resolved'}">${resolved?'Reopen':'Mark resolved'}</button>
-      </div>`;
-    }).join("");
-  }catch(e){ wrap.innerHTML="<span class='hint'>Couldn't load support requests.</span>"; }
+    if(!r.ok){ $("#sup-list").innerHTML="<div class='empty'>Couldn't load support requests.</div>"; return; }
+    const d=await r.json(); SUPPORT = d.items||[];
+    renderSupport(); renderOverview();
+    const open=SUPPORT.filter(i=>i.status!=="resolved").length;
+    $("#tab-support").textContent = open;
+    $("#tab-support").className = "count"+(open?" alert":"");
+  }catch(e){ $("#sup-list").innerHTML="<div class='empty'>Couldn't load support requests.</div>"; }
+}
+function renderSupport(){
+  const open=SUPPORT.filter(i=>i.status!=="resolved").length;
+  $("#sp-pill").innerHTML = open ? `<span class="pill open">${open} open</span>` : `<span class="pill on">all clear</span>`;
+  if(!SUPPORT.length){ $("#sup-list").innerHTML="<div class='empty'>No support requests yet. When a store sends one from the Help page, it shows up here.</div>"; return; }
+  $("#sup-list").innerHTML=SUPPORT.map(i=>{
+    const resolved=i.status==="resolved";
+    let when=i.ts; try{ when=new Date(i.ts).toLocaleString(); }catch(e){}
+    return `<div class="sup ${resolved?'res':''}">
+      <div class="sup-top"><span class="sup-cat">${esc(i.category||'Question')}</span>
+      <span class="pill ${resolved?'off':'open'}">${resolved?'resolved':'open'}</span>
+      <span class="sup-when">${esc(when)}</span></div>
+      ${i.subject?`<div class="sup-subj">${esc(i.subject)}</div>`:''}
+      <div class="sup-msg">${esc(i.message||'')}</div>
+      <div class="sup-who">${esc(i.userName||'')} · ${esc(i.storeName||'')} · <a href="mailto:${esc(i.userEmail||'')}">${esc(i.userEmail||'')}</a></div>
+      <div style="margin-top:10px"><button class="btn sm" data-sup="${esc(i.id)}" data-to="${resolved?'open':'resolved'}">${resolved?'Reopen':'Mark resolved'}</button></div>
+    </div>`;
+  }).join("");
 }
 document.addEventListener("click", async (e)=>{
   const b=e.target.closest("[data-sup]"); if(!b) return;
@@ -340,6 +480,8 @@ document.addEventListener("click", async (e)=>{
   try{ await fetch("/api/support/"+encodeURIComponent(b.dataset.sup)+"/status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({status:b.dataset.to})}); }catch(_){}
   loadSupport();
 });
+
+load();
 loadSupport();
 </script>
 </body>
