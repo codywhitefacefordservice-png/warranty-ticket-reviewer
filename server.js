@@ -749,6 +749,7 @@ function statusNote(level) {
 }
 function rankLevel(l) { return { operational: 0, maintenance: 1, degraded: 2, unknown: 2, outage: 3 }[l] || 0; }
 function worseOf(a, b) { return rankLevel(a) >= rankLevel(b) ? a : b; }
+function bestOf(a, b) { return rankLevel(a) <= rankLevel(b) ? a : b; }
 async function getSystemStatus() {
   if (STATUS_CACHE.data && Date.now() - STATUS_CACHE.at < 60000) return STATUS_CACHE.data;
   const [render, anthropic, openai] = await Promise.all([
@@ -762,14 +763,23 @@ async function getSystemStatus() {
   // is treated as fine (you're clearly connected). No vendor is ever named.
   const serviceLevel = (render.level === "degraded" || render.level === "maintenance" || render.level === "outage")
     ? render.level : "operational";
-  const reviewLevel = anthropic.level; // warranty reviews, appeals, Repair Story drafting
-  const storyCheckLevel = openai.level; // optional second-pass on Repair Stories
+  // Reviews, appeals, and Story drafting fail over across BOTH providers, so this
+  // capability is only impaired if EVERY provider is impaired — hence best-of.
+  const reviewLevel = bestOf(anthropic.level, openai.level);
+  // The optional Story fact-check runs only on the backup provider. Because it is
+  // optional and never blocks a review or a write-up, its user impact tops out at
+  // "degraded" — an unreachable provider means the extra polish is paused, not an
+  // outage of anything the dealership depends on.
+  const factCheckRaw = openai.level;
+  const factCheckLevel = rankLevel(factCheckRaw) > rankLevel("degraded") ? "degraded" : factCheckRaw;
   const components = [
-    { key: "service", name: "ClaimProof service", detail: "The website, your reviews, history, and reports.", level: serviceLevel, note: serviceLevel === "operational" ? "You're connected, so the service is online." : statusNote(serviceLevel) },
-    { key: "reviews", name: "Warranty review engine", detail: "Reviews, appeals, and Repair Story drafting.", level: reviewLevel, note: statusNote(reviewLevel) },
-    { key: "story", name: "Repair Story fact-check", detail: "Optional second-pass check on Repair Stories.", level: storyCheckLevel, note: statusNote(storyCheckLevel) },
+    { key: "service", critical: true, name: "ClaimProof service", detail: "The website, your reviews, history, and reports.", level: serviceLevel, note: serviceLevel === "operational" ? "You're connected, so the service is online." : statusNote(serviceLevel) },
+    { key: "reviews", critical: true, name: "Warranty review engine", detail: "Reviews, appeals, and Repair Story drafting.", level: reviewLevel, note: reviewLevel === "operational" ? "Running normally, with automatic backup protection." : statusNote(reviewLevel) },
+    { key: "story", critical: false, name: "Repair Story fact-check", detail: "Optional second-pass polish on Repair Stories.", level: factCheckLevel, note: factCheckLevel === "operational" ? "Running normally." : "Optional polish is paused right now — your reviews and write-ups are unaffected." },
   ];
-  const worst = components.reduce((w, c) => worseOf(w, c.level), "operational");
+  // The headline reflects only capabilities the dealership actually depends on;
+  // an optional, non-blocking feature never trips a service-disruption banner.
+  const worst = components.filter((c) => c.critical !== false).reduce((w, c) => worseOf(w, c.level), "operational");
   const data = { checkedAt: new Date().toISOString(), overall: worst, components };
   STATUS_CACHE = { at: Date.now(), data };
   return data;
@@ -1334,34 +1344,35 @@ function retryBackoffMs(attempt) {
   const base = Math.min(8000, 500 * Math.pow(2, attempt)); // 0.5s, 1s, 2s, 4s, 8s
   return Math.round(base * (0.7 + Math.random() * 0.6));    // ±30% jitter
 }
-async function anthropicMessages(body, opts) {
+async function postJSONWithRetry(url, headers, bodyObj, opts) {
   const retries = (opts && opts.retries != null) ? opts.retries : 3;
-  const url = "https://api.anthropic.com/v1/messages";
-  const headers = {
-    "content-type": "application/json",
-    "x-api-key": ANTHROPIC_API_KEY,
-    "anthropic-version": "2023-06-01",
-  };
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+      const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(bodyObj) });
       // Success, or a permanent error, or out of retries -> hand back to caller.
       if (r.ok || !RETRYABLE_STATUS.has(r.status) || attempt === retries) return r;
       const ra = Number(r.headers.get("retry-after"));
       const wait = ra > 0 ? Math.min(ra * 1000, 15000) : retryBackoffMs(attempt);
-      try { console.warn(`AI call ${r.status}; retry ${attempt + 1}/${retries} in ${wait}ms`); } catch (_) {}
+      try { console.warn(`upstream ${r.status}; retry ${attempt + 1}/${retries} in ${wait}ms`); } catch (_) {}
       await sleep(wait);
     } catch (e) {
       // Network-level failure (dropped connection, DNS, timeout).
       lastErr = e;
       if (attempt === retries) throw e;
       const wait = retryBackoffMs(attempt);
-      try { console.warn(`AI call network error (${e && e.message}); retry ${attempt + 1}/${retries} in ${wait}ms`); } catch (_) {}
+      try { console.warn(`upstream network error (${e && e.message}); retry ${attempt + 1}/${retries} in ${wait}ms`); } catch (_) {}
       await sleep(wait);
     }
   }
   if (lastErr) throw lastErr;
+}
+async function anthropicMessages(body, opts) {
+  return postJSONWithRetry("https://api.anthropic.com/v1/messages", {
+    "content-type": "application/json",
+    "x-api-key": ANTHROPIC_API_KEY,
+    "anthropic-version": "2023-06-01",
+  }, body, opts);
 }
 // Turn an upstream/provider error into a calm, advisor-friendly, vendor-free
 // message. The raw technical text still goes to the server logs.
@@ -1379,30 +1390,119 @@ function friendlyAiError(e) {
   return "Something went wrong running that request. Please try again in a moment.";
 }
 
+// --- Multi-provider failover -------------------------------------------------
+// The warranty review, appeal drafting, and Story drafting jobs all produce a
+// JSON result from a system prompt + user content (text + optional images/PDFs).
+// We run each job through an ordered list of AI providers: the primary first,
+// and if it errors OR returns something unparseable, we automatically fail over
+// to a backup provider that does the same job. Combined with the per-call retry
+// above, a single provider having a bad day no longer means downtime for the
+// dealership. Each adapter returns { text, blocks } so callers can pull plain
+// text (reviews/appeals) or the block list (Story sources).
+const OPENAI_REVIEW_MODEL = process.env.OPENAI_REVIEW_MODEL || "gpt-4o";
+
+async function providerAnthropic(job) {
+  const content = [...fileBlocks(job.files), { type: "text", text: job.text }];
+  const build = (withTemp) => {
+    const b = { model: job.anthropicModel || "claude-sonnet-4-5", max_tokens: job.maxTokens || 4000, system: job.system, messages: [{ role: "user", content }] };
+    if (withTemp && job.temperature != null) b.temperature = job.temperature;
+    if (job.anthropicTools) b.tools = job.anthropicTools;
+    return b;
+  };
+  let r = await anthropicMessages(build(true));
+  let data = await r.json();
+  // Some newer models reject `temperature`; retry once without it before failing.
+  if (!r.ok && job.temperature != null && /temperature/i.test(data?.error?.message || "")) {
+    r = await anthropicMessages(build(false));
+    data = await r.json();
+  }
+  if (!r.ok) { const e = new Error(data?.error?.message || "Primary AI error " + r.status); e.status = r.status; throw e; }
+  const blocks = data.content || [];
+  return { text: blocks.map((c) => (typeof c.text === "string" ? c.text : "")).join(""), blocks };
+}
+
+function openaiUserContent(text, files) {
+  const parts = [{ type: "text", text }];
+  let droppedPdf = 0;
+  for (const f of (files || []).slice(0, 4)) {
+    const type = String(f.type || ""), data = String(f.data || "");
+    if (!data || data.length > 14_000_000) continue;
+    if (IMAGE_TYPES.includes(type)) parts.push({ type: "image_url", image_url: { url: "data:" + type + ";base64," + data } });
+    else if (type === "application/pdf") droppedPdf++;
+  }
+  if (droppedPdf) parts[0].text += "\n\n[NOTE: " + droppedPdf + " PDF attachment(s) could not be included in this backup pass; weigh the typed details carefully.]";
+  return parts;
+}
+
+async function providerOpenAI(job) {
+  const body = {
+    model: OPENAI_REVIEW_MODEL,
+    temperature: job.temperature != null ? job.temperature : 0,
+    max_tokens: job.maxTokens || 4000,
+    messages: [
+      { role: "system", content: job.system },
+      { role: "user", content: openaiUserContent(job.text, job.files) },
+    ],
+  };
+  if (job.wantJson) body.response_format = { type: "json_object" };
+  const r = await postJSONWithRetry("https://api.openai.com/v1/chat/completions",
+    { "content-type": "application/json", authorization: "Bearer " + OPENAI_API_KEY }, body);
+  const data = await r.json();
+  if (!r.ok) { const e = new Error((data && data.error && data.error.message) || "Backup AI error " + r.status); e.status = r.status; throw e; }
+  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+  return { text, blocks: [{ type: "text", text }] };
+}
+
+// Ordered provider preference for structured jobs. `enabled` is evaluated lazily
+// so a key added later (or a future third provider) is picked up automatically.
+const REVIEW_PROVIDERS = [
+  { key: "anthropic", run: providerAnthropic, enabled: () => !!ANTHROPIC_API_KEY },
+  { key: "openai", run: providerOpenAI, enabled: () => !!OPENAI_API_KEY },
+];
+
+// Shared JSON extractor: strip accidental code fences, take the outermost object.
+function parseJsonObject(text) {
+  const t = String(text || "").trim().replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+  const s = t.indexOf("{"), e = t.lastIndexOf("}");
+  if (s === -1 || e === -1) throw new Error("The AI returned an unexpected format. Try again.");
+  return JSON.parse(t.slice(s, e + 1));
+}
+
+// Run a structured job across providers, failing over on error OR unparseable
+// output (parse runs inside the try, so a garbage response also fails over).
+// Returns { parsed, provider, failedOver }. Throws only if EVERY enabled
+// provider fails.
+async function runStructured(job, label, parse) {
+  const providers = REVIEW_PROVIDERS.filter((p) => p.enabled());
+  if (!providers.length) throw new Error("No AI provider is configured.");
+  let lastErr;
+  for (let i = 0; i < providers.length; i++) {
+    const p = providers[i];
+    try {
+      const res = await p.run(job);
+      const parsed = parse(res);
+      if (i > 0) { try { console.warn(`[failover] "${label}" served by backup provider "${p.key}"`); } catch (_) {} }
+      return { parsed, provider: p.key, failedOver: i > 0 };
+    } catch (e) {
+      lastErr = e;
+      try { console.error(`[provider ${p.key}] "${label}" failed:`, e && e.status, e && e.message); } catch (_) {}
+    }
+  }
+  throw lastErr || new Error("All AI providers are unavailable.");
+}
+
 async function draftAppeal(rejection, ticket, files) {
   const blocks = fileBlocks(files);
   const intro = blocks.length
     ? "Attached above: " + blocks.length + " file(s) of the claim paperwork.\n\n"
     : "";
-  const content = [
-    ...blocks,
-    { type: "text", text: intro + "=== REJECTION / CHARGEBACK NOTICE ===\n" + rejection + "\n\n=== ORIGINAL REPAIR ORDER / CLAIM ===\n" + (ticket || "(not provided)") },
-  ];
-  const r = await anthropicMessages({
-    model: "claude-sonnet-4-5",
-    max_tokens: 4000,
-    temperature: 0,
+  const job = {
     system: APPEAL_PROMPT,
-    messages: [{ role: "user", content }],
-  });
-  const data = await r.json();
-  if (!r.ok) { const err = new Error(data?.error?.message || "Anthropic API error " + r.status); err.status = r.status; throw err; }
-  let text = (data.content || []).map((c) => c.text || "").join("").trim();
-  text = text.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("The AI returned an unexpected format. Try again.");
-  return JSON.parse(text.slice(start, end + 1));
+    text: intro + "=== REJECTION / CHARGEBACK NOTICE ===\n" + rejection + "\n\n=== ORIGINAL REPAIR ORDER / CLAIM ===\n" + (ticket || "(not provided)"),
+    files, maxTokens: 4000, temperature: 0, wantJson: true,
+  };
+  const { parsed } = await runStructured(job, "appeal draft", (res) => parseJsonObject(res.text));
+  return parsed;
 }
 
 // RO style: the claim-ready write-up is always ALL CAPS
@@ -1496,26 +1596,13 @@ async function reviewTicket(ticket, recallInfo, files, claimType, rulesOverride)
   const intro = blocks.length
     ? "Attached above: " + blocks.length + " file(s) showing the physical repair-order hard card (time punches, initials, signatures). Cross-check them against the typed ticket below.\n\n"
     : "";
-  const content = [
-    ...blocks,
-    { type: "text", text: intro + "Review this warranty ticket:\n\n" + ticket + recallContext(recallInfo) },
-  ];
-  const r = await anthropicMessages({
-    model: "claude-sonnet-4-5",
-    max_tokens: 4000,
-    temperature: 0,
+  const job = {
     system: SYSTEM_PROMPT + claimTypeAddendum(claimType) + (rulesOverride || ""),
-    messages: [{ role: "user", content }],
-  });
-  const data = await r.json();
-  if (!r.ok) { const err = new Error(data?.error?.message || "Anthropic API error " + r.status); err.status = r.status; throw err; }
-  let text = (data.content || []).map((c) => c.text || "").join("").trim();
-  // Strip accidental code fences and grab the JSON object
-  text = text.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("The AI returned an unexpected format. Try again.");
-  return finalizeReview(JSON.parse(text.slice(start, end + 1)));
+    text: intro + "Review this warranty ticket:\n\n" + ticket + recallContext(recallInfo),
+    files, maxTokens: 4000, temperature: 0, wantJson: true,
+  };
+  const { parsed } = await runStructured(job, "warranty review", (res) => parseJsonObject(res.text));
+  return finalizeReview(parsed);
 }
 
 // ---------------------------------------------------------------------------
@@ -1743,24 +1830,28 @@ async function storyWrite(input, opts) {
   }
 
   const system = storySystem(opts);
-  // Step 1 — Claude drafts. If the writer enabled web lookup, try it first
-  // (best-effort). If the search response errors or doesn't parse as clean JSON,
-  // fall back to a no-tool call.
-  let draft = null;
-  if (opts.search) {
+  // Draft with automatic failover. Preference order:
+  //   1) primary AI with live web search (best — adds cited sources)
+  //   2) primary AI without search (still a full draft)
+  //   3) backup AI without search (keeps Story working during a primary outage)
+  // Whichever lands first wins; the optional refine pass runs afterward.
+  const attempts = [];
+  if (opts.search) attempts.push(() => providerAnthropic({ system, text: input, maxTokens: 3500, temperature: 0.4, anthropicTools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }] }));
+  attempts.push(() => providerAnthropic({ system, text: input, maxTokens: 3500, temperature: 0.4 }));
+  if (OPENAI_API_KEY) attempts.push(() => providerOpenAI({ system, text: input, maxTokens: 3500, temperature: 0.4, wantJson: true }));
+  let draft = null, lastErr = null;
+  for (const attempt of attempts) {
     try {
-      const data = await callStoryAPI(input, system, true);
-      draft = normalizeStory(parseStoryJSON(data.content), collectStorySources(data.content));
+      const res = await attempt();
+      draft = normalizeStory(parseStoryJSON(res.blocks), collectStorySources(res.blocks));
+      break;
     } catch (e) {
-      try { console.log("STORY search attempt failed (" + (e && e.message) + "); falling back to no-search call"); } catch (_) {}
+      lastErr = e;
+      try { console.error("Story draft attempt failed:", e && e.message); } catch (_) {}
     }
   }
-  if (!draft) {
-    const data = await callStoryAPI(input, system, false);
-    draft = normalizeStory(parseStoryJSON(data.content), []);
-  }
-  // Step 2 — ChatGPT refines & fact-checks (optional; returns the draft as-is if
-  // OPENAI_API_KEY is unset or the refine call fails).
+  if (!draft) throw lastErr || new Error("The Story service is unavailable right now. Please try again in a moment.");
+  // Optional second-pass refine & fact-check (returns the draft as-is on any failure).
   return await refineStory(draft, input, opts);
 }
 
