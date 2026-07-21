@@ -1321,6 +1321,64 @@ Rules:
     ? `\n\nYou also have the dealership's distilled Ford OWS Claiming reference below — cite its rules where the rejection concerns claim coding, causal part / condition code, comments, time claiming, exception codes, or sublet entry.\n\n=== FORD OWS CLAIMING REFERENCE ===\n` + OWS_REFERENCE
     : "");
 
+// --- Resilient upstream AI calls ---------------------------------------------
+// Warranty reviews, appeals, and Story drafting all ride on the same outside AI
+// provider. A brief provider blip (rate-limit, overload, a 5xx, or a dropped
+// connection) should never reach an advisor as a hard error, so every call to
+// that provider goes through anthropicMessages(): it retries transient failures
+// a few times with exponential backoff + jitter before giving up. Permanent
+// errors (bad request, auth) are returned immediately so real bugs aren't masked.
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504, 529]);
+function retryBackoffMs(attempt) {
+  const base = Math.min(8000, 500 * Math.pow(2, attempt)); // 0.5s, 1s, 2s, 4s, 8s
+  return Math.round(base * (0.7 + Math.random() * 0.6));    // ±30% jitter
+}
+async function anthropicMessages(body, opts) {
+  const retries = (opts && opts.retries != null) ? opts.retries : 3;
+  const url = "https://api.anthropic.com/v1/messages";
+  const headers = {
+    "content-type": "application/json",
+    "x-api-key": ANTHROPIC_API_KEY,
+    "anthropic-version": "2023-06-01",
+  };
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+      // Success, or a permanent error, or out of retries -> hand back to caller.
+      if (r.ok || !RETRYABLE_STATUS.has(r.status) || attempt === retries) return r;
+      const ra = Number(r.headers.get("retry-after"));
+      const wait = ra > 0 ? Math.min(ra * 1000, 15000) : retryBackoffMs(attempt);
+      try { console.warn(`AI call ${r.status}; retry ${attempt + 1}/${retries} in ${wait}ms`); } catch (_) {}
+      await sleep(wait);
+    } catch (e) {
+      // Network-level failure (dropped connection, DNS, timeout).
+      lastErr = e;
+      if (attempt === retries) throw e;
+      const wait = retryBackoffMs(attempt);
+      try { console.warn(`AI call network error (${e && e.message}); retry ${attempt + 1}/${retries} in ${wait}ms`); } catch (_) {}
+      await sleep(wait);
+    }
+  }
+  if (lastErr) throw lastErr;
+}
+// Turn an upstream/provider error into a calm, advisor-friendly, vendor-free
+// message. The raw technical text still goes to the server logs.
+function friendlyAiError(e) {
+  const status = e && e.status;
+  const msg = String((e && e.message) || "");
+  const transient = (status && RETRYABLE_STATUS.has(status))
+    || /overload|rate.?limit|timeout|timed out|ECONNRESET|ETIMEDOUT|EAI_AGAIN|fetch failed|network|temporar|too many requests|503|502|529/i.test(msg);
+  if (transient) {
+    return "The review service is busy right now — this is usually brief. Give it a moment and try again; your entries are still here.";
+  }
+  if (/unexpected format/i.test(msg)) {
+    return "The review came back in an unexpected format. Please try again.";
+  }
+  return "Something went wrong running that request. Please try again in a moment.";
+}
+
 async function draftAppeal(rejection, ticket, files) {
   const blocks = fileBlocks(files);
   const intro = blocks.length
@@ -1330,23 +1388,15 @@ async function draftAppeal(rejection, ticket, files) {
     ...blocks,
     { type: "text", text: intro + "=== REJECTION / CHARGEBACK NOTICE ===\n" + rejection + "\n\n=== ORIGINAL REPAIR ORDER / CLAIM ===\n" + (ticket || "(not provided)") },
   ];
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-5",
-      max_tokens: 4000,
-      temperature: 0,
-      system: APPEAL_PROMPT,
-      messages: [{ role: "user", content }],
-    }),
+  const r = await anthropicMessages({
+    model: "claude-sonnet-4-5",
+    max_tokens: 4000,
+    temperature: 0,
+    system: APPEAL_PROMPT,
+    messages: [{ role: "user", content }],
   });
   const data = await r.json();
-  if (!r.ok) throw new Error(data?.error?.message || "Anthropic API error " + r.status);
+  if (!r.ok) { const err = new Error(data?.error?.message || "Anthropic API error " + r.status); err.status = r.status; throw err; }
   let text = (data.content || []).map((c) => c.text || "").join("").trim();
   text = text.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
   const start = text.indexOf("{");
@@ -1450,23 +1500,15 @@ async function reviewTicket(ticket, recallInfo, files, claimType, rulesOverride)
     ...blocks,
     { type: "text", text: intro + "Review this warranty ticket:\n\n" + ticket + recallContext(recallInfo) },
   ];
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-5",
-      max_tokens: 4000,
-      temperature: 0,
-      system: SYSTEM_PROMPT + claimTypeAddendum(claimType) + (rulesOverride || ""),
-      messages: [{ role: "user", content }],
-    }),
+  const r = await anthropicMessages({
+    model: "claude-sonnet-4-5",
+    max_tokens: 4000,
+    temperature: 0,
+    system: SYSTEM_PROMPT + claimTypeAddendum(claimType) + (rulesOverride || ""),
+    messages: [{ role: "user", content }],
   });
   const data = await r.json();
-  if (!r.ok) throw new Error(data?.error?.message || "Anthropic API error " + r.status);
+  if (!r.ok) { const err = new Error(data?.error?.message || "Anthropic API error " + r.status); err.status = r.status; throw err; }
   let text = (data.content || []).map((c) => c.text || "").join("").trim();
   // Strip accidental code fences and grab the JSON object
   text = text.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
@@ -1594,11 +1636,7 @@ async function callStoryAPI(input, system, useSearch, withTemp = true) {
   // Newer models (Sonnet 5+) deprecated `temperature`; include it only when accepted.
   if (withTemp) body.temperature = 0.4;
   if (useSearch) body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }];
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify(body),
-  });
+  const r = await anthropicMessages(body);
   const data = await r.json();
   if (!r.ok) {
     const msg = data?.error?.message || "AI service error " + r.status;
@@ -2229,7 +2267,8 @@ app.post("/api/appeal", async (req, res) => {
     });
     res.json({ appeal });
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    try { console.error("AI request failed:", e && e.status, e && e.message); } catch (_) {}
+    res.status(502).json({ error: friendlyAiError(e), retryable: true });
   }
 });
 
@@ -2409,7 +2448,8 @@ app.post("/api/review", async (req, res) => {
     try { learnFromReview(req.ctx.store.id, review, new Date().toISOString()); } catch (_) {}
     res.json({ review, recallInfo });
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    try { console.error("AI request failed:", e && e.status, e && e.message); } catch (_) {}
+    res.status(502).json({ error: friendlyAiError(e), retryable: true });
   }
 });
 
@@ -2454,7 +2494,10 @@ app.post("/api/story", async (req, res) => {
       });
     } catch (_) {}
     res.json({ story });
-  } catch (e) { res.status(502).json({ error: e.message }); }
+  } catch (e) {
+    try { console.error("AI request failed:", e && e.status, e && e.message); } catch (_) {}
+    res.status(502).json({ error: friendlyAiError(e), retryable: true });
+  }
 });
 
 // ---------------------------------------------------------------------------
