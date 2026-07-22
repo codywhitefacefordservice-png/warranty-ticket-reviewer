@@ -942,7 +942,28 @@ function createStore({ name, city, slug, active = true, plan = "pilot" }) {
 // Which product tiers a store is entitled to. Unset (grandfathered) = both on.
 function storeFeatures(s) {
   const f = (s && s.features) || {};
-  return { story: f.story !== false, warranty: f.warranty !== false };
+  const warranty = f.warranty !== false;
+  return {
+    story: f.story !== false,
+    warranty,
+    // Migration-safe: stores created before the appeals split never set an
+    // `appeals` flag — for them, appeals follows warranty (old behavior).
+    appeals: f.appeals === undefined ? warranty : f.appeals !== false,
+  };
+}
+// The three subscription tiers. Setting a store's plan applies the preset in
+// one shot — this is what the console's tier picker calls. Individual feature
+// toggles still exist underneath for one-off exceptions.
+const PLANS = {
+  story:      { label: "Story",      features: { story: true, warranty: false, appeals: false } },
+  reviewer:   { label: "Reviewer",   features: { story: true, warranty: true,  appeals: false } },
+  everything: { label: "Everything", features: { story: true, warranty: true,  appeals: true  } },
+};
+function planOf(s) {
+  const f = storeFeatures(s);
+  if (f.warranty && f.appeals) return "everything";
+  if (f.warranty) return "reviewer";
+  return "story";
 }
 function createUser({ storeId, email, password, name, role = "advisor", active = true }) {
   const e = String(email || "").trim().toLowerCase();
@@ -2140,9 +2161,10 @@ app.use((req, res, next) => {
 // hiding nav links is cosmetic; THIS is what stops anyone getting tools free.
 function featureForPath(p) {
   if (p === "/story" || p === "/api/story") return "story";
-  if (p === "/" || p === "/appeal" || p === "/history" || p === "/resources") return "warranty";
+  if (p === "/" || p === "/history" || p === "/resources") return "warranty";
+  if (p === "/appeal" || p === "/api/appeal") return "appeals";
   if (p === "/insights" || p.indexOf("/api/insights") === 0) return "warranty";
-  if (p === "/api/review" || p === "/api/appeal" || p === "/api/resources") return "warranty";
+  if (p === "/api/review" || p === "/api/resources") return "warranty";
   if (p.indexOf("/api/history") === 0 || p.indexOf("/resources/file") === 0) return "warranty";
   // /reports and /api/reports are available on every tier; each store's entitlement
   // to specific datasets is enforced inside the report handlers (allowedDatasets).
@@ -2178,7 +2200,7 @@ app.get("/api/me", (req, res) => {
 // --- Owner console API (seam for the Phase 2 admin UI; owner-only) ----------
 app.get("/api/owner/stores", requireOwner, (_req, res) => {
   res.json({
-    stores: STORES.map((s) => ({ id: s.id, name: s.name, city: s.city, slug: s.slug, active: s.active !== false, plan: s.plan, features: storeFeatures(s), hasLogo: !!s.logoKey, users: USERS.filter((u) => u.storeId === s.id).length })),
+    stores: STORES.map((s) => ({ id: s.id, name: s.name, city: s.city, slug: s.slug, active: s.active !== false, plan: planOf(s), features: storeFeatures(s), hasLogo: !!s.logoKey, users: USERS.filter((u) => u.storeId === s.id).length })),
     users: USERS.map((u) => ({ id: u.id, storeId: u.storeId, email: u.email, name: u.name, role: u.role, active: u.active !== false, mfa: !!(u.mfa && u.mfa.enrolled) })),
   });
 });
@@ -2216,6 +2238,17 @@ app.post("/api/owner/stores/:id/limits", requireOwner, (req, res) => {
   res.json({ ok: true, limits: s.limits, usage: usageFor(s.id) });
 });
 
+// One-click tier assignment — the simple path the console uses.
+app.post("/api/owner/stores/:id/plan", requireOwner, (req, res) => {
+  const s = storeById(req.params.id);
+  if (!s) return res.status(404).json({ error: "unknown store" });
+  const plan = String((req.body || {}).plan || "").toLowerCase();
+  if (!PLANS[plan]) return res.status(400).json({ error: "Unknown plan — choose story, reviewer, or everything." });
+  s.plan = plan;
+  s.features = Object.assign({}, PLANS[plan].features);
+  saveStores();
+  res.json({ ok: true, plan, features: storeFeatures(s) });
+});
 app.post("/api/owner/stores/:id/features", requireOwner, (req, res) => {
   const s = storeById(req.params.id);
   if (!s) return res.status(404).json({ error: "unknown store" });
@@ -2223,14 +2256,20 @@ app.post("/api/owner/stores/:id/features", requireOwner, (req, res) => {
   s.features = s.features || { story: true, warranty: false };
   if (typeof b.story === "boolean") s.features.story = b.story;
   if (typeof b.warranty === "boolean") s.features.warranty = b.warranty;
+  if (typeof b.appeals === "boolean") s.features.appeals = b.appeals;
   saveStores();
   res.json({ ok: true, features: storeFeatures(s) });
 });
 app.post("/api/owner/stores", requireOwner, (req, res) => {
-  const { name, city, slug } = req.body || {};
+  const { name, city, slug, plan } = req.body || {};
   if (!String(name || "").trim()) return res.status(400).json({ error: "Store name is required." });
   const s = createStore({ name, city, slug });
-  res.json({ store: s });
+  // Apply the chosen subscription tier at birth (defaults to Reviewer).
+  const p = PLANS[String(plan || "").toLowerCase()] ? String(plan).toLowerCase() : "reviewer";
+  s.plan = p;
+  s.features = Object.assign({}, PLANS[p].features);
+  saveStores();
+  res.json({ store: s, plan: p, features: storeFeatures(s) });
 });
 app.post("/api/owner/stores/:id/active", requireOwner, (req, res) => {
   const s = storeById(req.params.id);
