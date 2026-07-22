@@ -202,6 +202,11 @@
           <div class="field"><label>Dealership name</label><input id="ns-name" placeholder="e.g. Bravo Ford"></div>
           <div class="field"><label>City / location</label><input id="ns-city" placeholder="e.g. Amarillo, TX"></div>
           <div class="field"><label>Login slug <span class="hint">(optional)</span></label><input id="ns-slug" placeholder="auto from name"></div>
+          <div class="field"><label>Subscription tier</label><select id="ns-plan" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff">
+            <option value="story">Story — Repair Story only (any make, any shop)</option>
+            <option value="reviewer" selected>Reviewer — Story + warranty reviews</option>
+            <option value="everything">Everything — all tools incl. Appeals</option>
+          </select></div>
         </div>
         <div style="margin-top:14px"><button class="btn brand" id="ns-add">Create store</button></div>
         <div class="msg" id="ns-msg"></div>
@@ -282,11 +287,12 @@ function renderOverview(){
   // plan mix table
   if(!stores.length){ $("#planmix").innerHTML = "<div class='empty'>No stores yet — add one from the Stores tab.</div>"; }
   else {
-    $("#planmix").innerHTML = `<table><thead><tr><th>Store</th><th>Warranty tools</th><th>Repair Story</th><th>Status</th></tr></thead><tbody>`+
+    const TIER_LABEL={story:"Story",reviewer:"Reviewer",everything:"Everything"};
+    $("#planmix").innerHTML = `<table><thead><tr><th>Store</th><th>Tier</th><th>Appeals</th><th>Status</th></tr></thead><tbody>`+
       stores.map(s=>{
         const f=s.features||{};
         const p=(on)=>`<span class="pill ${on?'on':'off'}"><span class="d"></span>${on?'on':'off'}</span>`;
-        return `<tr><td><b>${esc(s.name)}</b></td><td>${p(!!f.warranty)}</td><td>${p(!!f.story)}</td><td><span class="pill ${s.active?'on':'off'}">${s.active?'active':'inactive'}</span></td></tr>`;
+        return `<tr><td><b>${esc(s.name)}</b></td><td><b>${TIER_LABEL[s.plan]||"—"}</b></td><td>${p(!!f.appeals)}</td><td><span class="pill ${s.active?'on':'off'}">${s.active?'active':'inactive'}</span></td></tr>`;
       }).join("")+`</tbody></table>`;
   }
   renderOverviewSupport();
@@ -329,10 +335,11 @@ function renderStores(){
         </div>
       </div>
       <div class="plans">
-        <span class="plan-lab">Plan:</span>
-        <button class="plan-btn ${f.story?'on':''}" data-feat="story" data-sid="${s.id}" data-to="${f.story?0:1}">Repair Story ${f.story?'✓':'—'}</button>
-        <button class="plan-btn ${f.warranty?'on':''}" data-feat="warranty" data-sid="${s.id}" data-to="${f.warranty?0:1}">Warranty tools ${f.warranty?'✓':'—'}</button>
-        <span class="hint" style="margin-left:4px">Off blocks the tool server-side — the shop can't reach it.</span>
+        <span class="plan-lab">Tier:</span>
+        <button class="plan-btn ${s.plan==='story'?'on':''}" data-plan="story" data-sid="${s.id}" title="Repair Story only — works for any make, any shop">Story${s.plan==='story'?' ✓':''}</button>
+        <button class="plan-btn ${s.plan==='reviewer'?'on':''}" data-plan="reviewer" data-sid="${s.id}" title="Story + warranty reviews, history, insights, reports">Reviewer${s.plan==='reviewer'?' ✓':''}</button>
+        <button class="plan-btn ${s.plan==='everything'?'on':''}" data-plan="everything" data-sid="${s.id}" title="All tools including the appeal &amp; chargeback drafter">Everything${s.plan==='everything'?' ✓':''}</button>
+        <span class="hint" style="margin-left:4px">One click switches the whole plan — enforced server-side.</span>
       </div>
       <div class="store-body">
         <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>
@@ -377,9 +384,8 @@ function wire(){
     const r=await fetch(`/api/owner/users/${b.dataset.mfareset}/reset-mfa`,{method:"POST",headers:{"content-type":"application/json"}});
     if(r.ok){ load(); } else { b.disabled=false; alert("Couldn't reset MFA — try again."); }
   });
-  document.querySelectorAll("[data-feat]").forEach(b=>b.onclick=async()=>{
-    const body={}; body[b.dataset.feat]=(b.dataset.to==="1");
-    const r=await fetch(`/api/owner/stores/${b.dataset.sid}/features`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+  document.querySelectorAll("[data-plan]").forEach(b=>b.onclick=async()=>{
+    const r=await fetch(`/api/owner/stores/${b.dataset.sid}/plan`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({plan:b.dataset.plan})});
     if(r.ok) load(); else alert("Couldn't update the plan.");
   });
   document.querySelectorAll("[data-nu-add]").forEach(b=>b.onclick=async()=>{
@@ -438,9 +444,10 @@ $("#ns-add").onclick=async()=>{
   const name=$("#ns-name").value.trim(), city=$("#ns-city").value.trim(), slug=$("#ns-slug").value.trim();
   const m=$("#ns-msg");
   if(!name){ m.className="msg err"; m.textContent="Dealership name is required."; return; }
-  const r=await fetch("/api/owner/stores",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name,city,slug})});
+  const plan=$("#ns-plan").value;
+  const r=await fetch("/api/owner/stores",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name,city,slug,plan})});
   const d=await r.json();
-  if(r.ok){ m.className="msg ok"; m.textContent="Store created."; $("#ns-name").value=$("#ns-city").value=$("#ns-slug").value=""; load(); }
+  if(r.ok){ m.className="msg ok"; m.textContent="Store created on the "+plan+" tier."; $("#ns-name").value=$("#ns-city").value=$("#ns-slug").value=""; load(); }
   else { m.className="msg err"; m.textContent=d.error||"Could not create store."; }
 };
 
