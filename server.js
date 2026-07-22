@@ -977,6 +977,55 @@ if (!STORES.length) {
   if (ch) saveStores();
 }
 
+// ---------------------------------------------------------------------------
+// Usage metering. Counts each store's successful reviews, appeals, and Stories
+// per calendar month (UTC), persisted to the data disk. This is the plumbing
+// that lets pricing tiers mean something: a store can be given optional monthly
+// limits (store.limits = { reviews: 200, ... }); when a limit is reached the
+// endpoint returns a friendly 429 instead of running the AI. No limit set
+// (the default) = unlimited — existing stores are unaffected until the owner
+// sets a number. Cache-hit reviews still count: the store received the product
+// value either way, and counting only AI calls would make bills unpredictable.
+// ---------------------------------------------------------------------------
+const USAGE_FILE = path.join(HISTORY_DIR, "usage.json");
+let USAGE = {};
+try { if (fs.existsSync(USAGE_FILE)) USAGE = JSON.parse(fs.readFileSync(USAGE_FILE, "utf8")) || {}; } catch (e) { console.error("usage load:", e.message); }
+function saveUsage() {
+  try {
+    const tmp = USAGE_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(USAGE, null, 2));
+    fs.renameSync(tmp, USAGE_FILE);
+  } catch (e) { console.error("usage save:", e.message); }
+}
+function monthKey(d) {
+  const x = d || new Date();
+  return x.getUTCFullYear() + "-" + String(x.getUTCMonth() + 1).padStart(2, "0");
+}
+const USAGE_KINDS = ["reviews", "appeals", "stories"];
+function usageFor(storeId, ym) {
+  const m = (USAGE[storeId] || {})[ym || monthKey()] || {};
+  return { reviews: m.reviews || 0, appeals: m.appeals || 0, stories: m.stories || 0 };
+}
+function bumpUsage(storeId, kind) {
+  if (!USAGE_KINDS.includes(kind)) return;
+  const ym = monthKey();
+  USAGE[storeId] = USAGE[storeId] || {};
+  USAGE[storeId][ym] = USAGE[storeId][ym] || {};
+  USAGE[storeId][ym][kind] = (USAGE[storeId][ym][kind] || 0) + 1;
+  saveUsage();
+}
+const USAGE_LABEL = { reviews: "reviews", appeals: "appeals", stories: "Repair Stories" };
+// Returns a friendly message if the store has hit its monthly limit for `kind`,
+// else null. Limits are per-store, optional, and live on store.limits.
+function limitExceeded(store, kind) {
+  const lim = store && store.limits && Number(store.limits[kind]);
+  if (!lim || lim <= 0) return null; // unset/0/null = unlimited
+  const used = usageFor(store.id)[kind];
+  if (used < lim) return null;
+  return "This store has used all " + lim + " included " + (USAGE_LABEL[kind] || kind) +
+    " for this month (" + used + " of " + lim + "). The count resets on the 1st — or contact your administrator about a higher plan.";
+}
+
 // Resolve the logged-in {user, store} from the request, or null.
 function sessionCtx(req) {
   const s = readSession(cookieVal(req, "wtr_sess"));
@@ -2133,6 +2182,40 @@ app.get("/api/owner/stores", requireOwner, (_req, res) => {
     users: USERS.map((u) => ({ id: u.id, storeId: u.storeId, email: u.email, name: u.name, role: u.role, active: u.active !== false, mfa: !!(u.mfa && u.mfa.enrolled) })),
   });
 });
+// Usage metering (owner): current + previous month per store, with limits.
+app.get("/api/owner/usage", requireOwner, (_req, res) => {
+  const now = new Date();
+  const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const ym = monthKey(now), ymPrev = monthKey(prev);
+  res.json({
+    month: ym,
+    stores: STORES.map((s) => ({
+      id: s.id, name: s.name, active: s.active !== false,
+      usage: usageFor(s.id, ym),
+      previous: usageFor(s.id, ymPrev),
+      limits: s.limits || {},
+    })),
+  });
+});
+// Set/clear a store's monthly limits. Body: { reviews: 200, appeals: null, ... }
+// A positive number sets the cap; null/0 clears it (unlimited).
+app.post("/api/owner/stores/:id/limits", requireOwner, (req, res) => {
+  const s = storeById(req.params.id);
+  if (!s) return res.status(404).json({ error: "unknown store" });
+  const b = req.body || {};
+  s.limits = s.limits || {};
+  for (const k of USAGE_KINDS) {
+    if (!(k in b)) continue;
+    const v = b[k];
+    if (v === null || v === 0 || v === "" || v === false) { delete s.limits[k]; continue; }
+    const n = Math.floor(Number(v));
+    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: "Limit for " + k + " must be a positive whole number, or null to remove it." });
+    s.limits[k] = n;
+  }
+  saveStores();
+  res.json({ ok: true, limits: s.limits, usage: usageFor(s.id) });
+});
+
 app.post("/api/owner/stores/:id/features", requireOwner, (req, res) => {
   const s = storeById(req.params.id);
   if (!s) return res.status(404).json({ error: "unknown store" });
@@ -2313,6 +2396,8 @@ app.get("/appeal", (_req, res) => {
 });
 
 app.post("/api/appeal", async (req, res) => {
+  const _lim = limitExceeded(req.ctx.store, "appeals");
+  if (_lim) return res.status(429).json({ error: _lim, limitReached: true });
   const rejection = String(req.body.rejection || "").trim();
   const ticket = String(req.body.ticket || "").trim();
   if (!rejection) return res.status(400).json({ error: "Paste the rejection or chargeback notice first." });
@@ -2345,6 +2430,7 @@ app.post("/api/appeal", async (req, res) => {
       ticket, rejection,
       result: appeal,
     });
+    bumpUsage(req.ctx.store.id, "appeals");
     res.json({ appeal });
   } catch (e) {
     try { console.error("AI request failed:", e && e.status, e && e.message); } catch (_) {}
@@ -2419,6 +2505,8 @@ app.post("/api/vin", async (req, res) => {
 });
 
 app.post("/api/review", async (req, res) => {
+  const _lim = limitExceeded(req.ctx.store, "reviews");
+  if (_lim) return res.status(429).json({ error: _lim, limitReached: true });
   const b = req.body || {};
   const f = {
     claimType: String(b.claimtype || b.claimType || "").trim(),
@@ -2526,6 +2614,7 @@ app.post("/api/review", async (req, res) => {
     });
     // Learn from this review so the store's memory sharpens over time.
     try { learnFromReview(req.ctx.store.id, review, new Date().toISOString()); } catch (_) {}
+    bumpUsage(req.ctx.store.id, "reviews");
     res.json({ review, recallInfo });
   } catch (e) {
     try { console.error("AI request failed:", e && e.status, e && e.message); } catch (_) {}
@@ -2549,6 +2638,8 @@ app.get("/story", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "story.html"));
 });
 app.post("/api/story", async (req, res) => {
+  const _lim = limitExceeded(req.ctx.store, "stories");
+  if (_lim) return res.status(429).json({ error: _lim, limitReached: true });
   const b = req.body || {};
   const concern = String(b.concern || "").trim();
   const found = String(b.found || "").trim();
@@ -2573,6 +2664,7 @@ app.post("/api/story", async (req, res) => {
         component: component || "", search: !!opts.search, readings: !!opts.readings,
       });
     } catch (_) {}
+    bumpUsage(req.ctx.store.id, "stories");
     res.json({ story });
   } catch (e) {
     try { console.error("AI request failed:", e && e.status, e && e.message); } catch (_) {}
