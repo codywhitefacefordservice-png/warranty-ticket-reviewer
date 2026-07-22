@@ -3098,4 +3098,108 @@ app.delete("/api/history/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------------------------------------------------------------------------
+// Backups. Everything a dealership would cry over losing — reviews, history
+// files, stores/users, the support inbox — lives in HISTORY_DIR on a single
+// disk. Two layers of protection:
+//   1) On-demand: the owner can download a complete archive any time from
+//      /api/backup/download (login as owner, then open that URL).
+//   2) Automatic: when S3 credentials are present in the environment
+//      (BACKUP_S3_BUCKET + AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY, optional
+//      AWS_REGION / BACKUP_PREFIX / BACKUP_KEEP), a nightly job uploads the
+//      same archive off-site, encrypted at rest, and prunes old copies.
+//      Turning it on requires NO code change — add the env vars and redeploy.
+// ---------------------------------------------------------------------------
+const { spawn: spawnProc } = require("child_process");
+const os = require("os");
+const BACKUP_S3_BUCKET = process.env.BACKUP_S3_BUCKET || "";
+const BACKUP_PREFIX = process.env.BACKUP_PREFIX || "claimproof-backups/";
+const BACKUP_KEEP = Math.max(3, parseInt(process.env.BACKUP_KEEP || "14", 10) || 14);
+const BACKUP_CONFIGURED = !!(BACKUP_S3_BUCKET && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+let LAST_BACKUP = { at: null, ok: null, error: null, bytes: 0 };
+let BACKUP_RUNNING = false;
+
+function backupStamp() {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + "-" + p(d.getUTCHours()) + p(d.getUTCMinutes());
+}
+// tar+gzip the entire data directory to a temp file; resolves with the path.
+function makeBackupArchive() {
+  return new Promise((resolve, reject) => {
+    const out = path.join(os.tmpdir(), "claimproof-backup-" + backupStamp() + "-" + crypto.randomBytes(4).toString("hex") + ".tar.gz");
+    const t = spawnProc("tar", ["czf", out, "-C", HISTORY_DIR, "."]);
+    let err = "";
+    t.stderr.on("data", (d) => { err += d; });
+    t.on("error", reject);
+    t.on("close", (code) => (code === 0 ? resolve(out) : reject(new Error("tar exited " + code + ": " + err.slice(0, 300)))));
+  });
+}
+
+// Owner-only: download a complete backup of all data, right now.
+app.get("/api/backup/download", requireOwner, async (_req, res) => {
+  let file = null;
+  try {
+    file = await makeBackupArchive();
+    const stat = fs.statSync(file);
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Length", stat.size);
+    res.setHeader("Content-Disposition", 'attachment; filename="claimproof-backup-' + backupStamp() + '.tar.gz"');
+    const stream = fs.createReadStream(file);
+    const cleanup = () => { try { fs.unlinkSync(file); } catch {} };
+    stream.on("close", cleanup);
+    stream.on("error", cleanup);
+    stream.pipe(res);
+  } catch (e) {
+    if (file) { try { fs.unlinkSync(file); } catch {} }
+    res.status(500).json({ error: "Could not build the backup: " + e.message });
+  }
+});
+// Owner-only: is automatic backup on, and how did the last one go?
+app.get("/api/backup/status", requireOwner, (_req, res) => {
+  res.json({ automatic: BACKUP_CONFIGURED, keep: BACKUP_KEEP, last: LAST_BACKUP });
+});
+
+// Upload one backup to S3 (encrypted at rest) and prune beyond BACKUP_KEEP.
+async function s3BackupOnce(reason) {
+  if (!BACKUP_CONFIGURED || BACKUP_RUNNING) return;
+  BACKUP_RUNNING = true;
+  let file = null;
+  try {
+    const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+    const s3 = new S3Client({ region: process.env.AWS_REGION || "us-east-1" });
+    file = await makeBackupArchive();
+    const body = fs.readFileSync(file);
+    const key = BACKUP_PREFIX + "claimproof-" + backupStamp() + ".tar.gz";
+    await s3.send(new PutObjectCommand({ Bucket: BACKUP_S3_BUCKET, Key: key, Body: body, ServerSideEncryption: "AES256", ContentType: "application/gzip" }));
+    const listed = await s3.send(new ListObjectsV2Command({ Bucket: BACKUP_S3_BUCKET, Prefix: BACKUP_PREFIX }));
+    const objs = (listed.Contents || []).slice().sort((a, b) => new Date(a.LastModified) - new Date(b.LastModified));
+    while (objs.length > BACKUP_KEEP) {
+      const old = objs.shift();
+      await s3.send(new DeleteObjectCommand({ Bucket: BACKUP_S3_BUCKET, Key: old.Key }));
+    }
+    LAST_BACKUP = { at: new Date().toISOString(), ok: true, error: null, bytes: body.length };
+    console.log("[backup] " + reason + " backup uploaded: " + key + " (" + body.length + " bytes)");
+  } catch (e) {
+    LAST_BACKUP = { at: new Date().toISOString(), ok: false, error: String((e && e.message) || e), bytes: 0 };
+    console.error("[backup] " + reason + " backup FAILED:", e && e.message);
+  } finally {
+    if (file) { try { fs.unlinkSync(file); } catch {} }
+    BACKUP_RUNNING = false;
+  }
+}
+// Owner-only: kick an off-site backup right now (useful before risky changes).
+app.post("/api/backup/run", requireOwner, async (_req, res) => {
+  if (!BACKUP_CONFIGURED) return res.status(400).json({ error: "Automatic backups aren't configured yet — set BACKUP_S3_BUCKET and AWS keys in the environment." });
+  if (BACKUP_RUNNING) return res.status(409).json({ error: "A backup is already running." });
+  await s3BackupOnce("manual");
+  res.json({ ok: LAST_BACKUP.ok, last: LAST_BACKUP });
+});
+if (BACKUP_CONFIGURED) {
+  setTimeout(() => s3BackupOnce("startup"), 5 * 60 * 1000);          // first backup 5 min after boot
+  setInterval(() => s3BackupOnce("nightly"), 24 * 60 * 60 * 1000);   // then every 24h
+  console.log("[backup] automatic off-site backups ON -> s3://" + BACKUP_S3_BUCKET + "/" + BACKUP_PREFIX + " (keeping " + BACKUP_KEEP + ")");
+} else {
+  console.log("[backup] automatic backups NOT configured. Owner can still download a full backup at /api/backup/download. To enable nightly off-site backups, set BACKUP_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (and optionally AWS_REGION).");
+}
+
 app.listen(PORT, () => console.log("Warranty Ticket Reviewer listening on port " + PORT));
