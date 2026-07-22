@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Assistant — ClaimProof</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --brand:#003478; --brand-2:#0a4bb3; --red:#c8102e;
+    --page:#eef1f5; --surface:#ffffff; --ink:#0e1726; --ink-2:#4a5568; --muted:#8a94a6;
+    --grid:#e3e8ef; --border:#d7dee8; --good:#0a8a3a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --brand:#1b4ea0; --brand-2:#5b8def; --red:#ef5a6f;
+      --page:#0c1017; --surface:#141a24; --ink:#f2f5fa; --ink-2:#b8c2d0; --muted:#7c8698;
+      --grid:#242c38; --border:#2b3442; --good:#38c172; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .topbar{background:#ffffff;border-bottom:3px solid #003478}
+  .accent{height:2px;background:#c8102e}
+  .topbar-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  #logo{height:48px;display:block}
+  .wordmark{display:none;flex-direction:column;line-height:1}
+  .wordmark b{color:#003478;font-size:22px;font-weight:800;letter-spacing:.05em}
+  .wordmark small{color:#c8102e;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}
+  .nav a{color:#4a5568;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-decoration:none;margin-left:16px;white-space:nowrap}
+  .nav a:hover{color:#0a4bb3} .nav a.active{color:#003478;border-bottom:2px solid #003478;padding-bottom:2px}
+  .wrap{max-width:840px;margin:0 auto;padding:22px 16px 40px;display:flex;flex-direction:column;min-height:calc(100vh - 90px)}
+  .page-title{font-size:20px;font-weight:800;margin:6px 0 2px}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:14px}
+  .privacy{display:inline-block;font-size:11.5px;font-weight:700;color:var(--ink-2);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:3px 11px;margin-left:8px;vertical-align:middle}
+
+  #thread{flex:1;display:flex;flex-direction:column;gap:12px;padding:4px 0 16px}
+  .msg{max-width:85%;padding:11px 15px;border-radius:12px;white-space:pre-wrap;font-size:14.5px;box-shadow:0 1px 2px rgba(16,23,38,.05)}
+  .msg.user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px}
+  .msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:4px}
+  .msg.err{align-self:flex-start;background:rgba(200,16,46,.07);border:1px solid rgba(200,16,46,.4);color:var(--ink)}
+  .msg .retry{margin-top:8px}
+  .retry button{padding:5px 14px;font-size:12.5px;font-weight:700;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--ink);cursor:pointer}
+  .srcs{margin-top:9px;padding-top:8px;border-top:1px solid var(--grid);font-size:12px}
+  .srcs b{display:block;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;font-size:10.5px;margin-bottom:3px}
+  .srcs a{color:var(--brand-2);text-decoration:none;display:block;margin:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:520px}
+  .srcs a:hover{text-decoration:underline}
+  .typing{align-self:flex-start;color:var(--muted);font-size:13px;padding:8px 4px}
+  .typing i{display:inline-block;width:6px;height:6px;margin-right:3px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+  .welcome{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+  .welcome h2{font-size:14px;margin:0 0 8px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--brand)}
+  @media (prefers-color-scheme: dark){ .welcome h2{color:var(--brand-2)} }
+  .welcome p{margin:0 0 10px;font-size:13.5px;color:var(--ink-2)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chips button{padding:7px 13px;font-size:12.5px;font-weight:600;border:1px solid var(--border);border-radius:999px;background:var(--page);color:var(--ink);cursor:pointer;text-align:left}
+  .chips button:hover{border-color:var(--brand-2);color:var(--brand-2)}
+
+  .composer{position:sticky;bottom:0;background:var(--page);padding:10px 0 14px}
+  .composer-in{display:flex;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;box-shadow:0 2px 10px rgba(16,23,38,.08)}
+  textarea{flex:1;border:0;background:transparent;color:var(--ink);font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;resize:none;padding:6px 8px;max-height:150px;outline:none}
+  #send{padding:10px 18px;font-size:14px;font-weight:700;border:1px solid var(--brand);border-radius:9px;background:var(--brand);color:#fff;cursor:pointer}
+  #send:hover{filter:brightness(1.08)}
+  #send:disabled{opacity:.55;cursor:wait}
+  .foot{font-size:11.5px;color:var(--muted);margin-top:7px;text-align:center}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <a class="brand" href="/">
+    <img id="logo" alt="" style="display:none">
+    <span id="wordmark" class="wordmark"><b></b><small></small></span>
+  </a>
+  <nav class="nav">
+    <a href="/">Reviewer</a>
+    <a href="/history">History</a>
+    <a href="/logout">Sign out</a>
+  </nav>
+</div></div>
+<div class="accent"></div>
+
+<div class="wrap">
+  <div class="page-title">Assistant <span class="privacy">Conversations are not saved</span></div>
+  <div class="page-sub">Ask technical or warranty questions — diagnosis help, coverage rules, claim coding, TSBs and recalls. It can look things up online and shows its sources.</div>
+
+  <div id="thread">
+    <div class="welcome" id="welcome">
+      <h2>What can I help with?</h2>
+      <p>Answers are a starting point for trained staff — always confirm specs and coverage against the manufacturer's official service and warranty information. Nothing you type here is saved; the conversation clears when you leave the page.</p>
+      <div class="chips">
+        <button data-q="What are the most common reasons a warranty claim gets denied, and how do I avoid them?">Common claim denial reasons</button>
+        <button data-q="Walk me through diagnosing a P0301 cylinder 1 misfire.">Diagnose a P0301 misfire</button>
+        <button data-q="When does a repair need prior approval before I start it?">When is prior approval needed?</button>
+        <button data-q="What's the difference between claim type 11 and an ESP claim, and how is each submitted?">Claim type 11 vs ESP</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-in">
+      <textarea id="q" rows="1" placeholder="Ask a technical or warranty question…"></textarea>
+      <button id="send">Send</button>
+    </div>
+    <div class="foot">AI answers can be wrong — verify specs, coverage, and coding against official service and warranty publications before acting.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var thread=$("thread"), q=$("q"), send=$("send");
+  var history=[];           // in-memory only — never persisted anywhere
+  var busy=false;
+
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+  function scrollDown(){window.scrollTo(0,document.body.scrollHeight)}
+
+  function addMsg(cls,text){
+    var d=document.createElement("div");
+    d.className="msg "+cls;
+    d.textContent=text;
+    thread.appendChild(d); scrollDown();
+    return d;
+  }
+  function addSources(el,sources){
+    if(!sources||!sources.length) return;
+    var s=document.createElement("div");
+    s.className="srcs";
+    s.innerHTML="<b>Sources</b>"+sources.map(function(x){
+      return '<a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.title||x.url)+'</a>';
+    }).join("");
+    el.appendChild(s);
+  }
+
+  function autoGrow(){ q.style.height="auto"; q.style.height=Math.min(q.scrollHeight,150)+"px"; }
+  q.addEventListener("input",autoGrow);
+  q.addEventListener("keydown",function(e){
+    if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); ask(); }
+  });
+  send.addEventListener("click",ask);
+  document.querySelectorAll(".chips button").forEach(function(b){
+    b.addEventListener("click",function(){ q.value=b.getAttribute("data-q"); autoGrow(); ask(); });
+  });
+
+  function ask(){
+    if(busy) return;
+    var text=q.value.trim();
+    if(!text) return;
+    var w=$("welcome"); if(w) w.remove();
+    q.value=""; autoGrow();
+    addMsg("user",text);
+    history.push({role:"user",text:text});
+    go();
+  }
+
+  function go(){
+    busy=true; send.disabled=true;
+    var t=document.createElement("div");
+    t.className="typing"; t.innerHTML="<i></i><i></i><i></i> thinking…";
+    thread.appendChild(t); scrollDown();
+    fetch("/api/chat",{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({messages:history.slice(-12)})
+    }).then(function(r){return r.json().then(function(j){return{ok:r.ok,status:r.status,j:j}})})
+    .then(function(res){
+      t.remove();
+      if(res.ok&&res.j&&res.j.answer){
+        var el=addMsg("bot",res.j.answer);
+        addSources(el,res.j.sources);
+        history.push({role:"assistant",text:res.j.answer});
+      } else {
+        var msg=(res.j&&res.j.error)||"Something went wrong. Please try again.";
+        var el2=addMsg("err",msg);
+        if(res.j&&res.j.retryable){
+          var r=document.createElement("div"); r.className="retry";
+          var b=document.createElement("button"); b.textContent="Try again";
+          b.addEventListener("click",function(){ el2.remove(); go(); });
+          r.appendChild(b); el2.appendChild(r);
+        }
+      }
+    }).catch(function(){
+      t.remove();
+      var el3=addMsg("err","Couldn't reach the server — check your connection and try again.");
+      var r=document.createElement("div"); r.className="retry";
+      var b=document.createElement("button"); b.textContent="Try again";
+      b.addEventListener("click",function(){ el3.remove(); go(); });
+      r.appendChild(b); el3.appendChild(r);
+    }).finally(function(){
+      busy=false; send.disabled=false; q.focus();
+    });
+  }
+
+  q.focus();
+})();
+</script>
+<script src="/appbrand.js"></script>
+</body>
+</html>

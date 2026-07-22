@@ -194,6 +194,7 @@
     if (feat.warranty) nav.appendChild(link("/", "Reviewer", path === "/"));
     if (feat.story) nav.appendChild(link("/story", "Story", path === "/story"));
     if (appeals) nav.appendChild(link("/appeal", "Appeals", path === "/appeal"));
+    if (feat.warranty) nav.appendChild(link("/chat", "Assistant", path === "/chat"));
     nav.appendChild(link("/history", "History", path === "/history"));
 
     /* More menu */
