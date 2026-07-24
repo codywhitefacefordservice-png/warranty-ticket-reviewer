@@ -346,6 +346,30 @@ for (const p of [
 }
 if (!ESP_REFERENCE) console.log("No ESP claiming reference file found.");
 
+// ---------------------------------------------------------------------------
+// Optional Claims Practice reference — distilled from the dealership's own
+// casework history (coding rules, documentation standards, denial patterns,
+// appeal strategies, ESP/prior-approval practice, instructive cases). Loaded
+// from (in order): CLAIMS_REFERENCE_FILE env var, Render secret file, or a
+// local claims_reference.md. Kept OUT of the public repo — deploy as a Render
+// Secret File. Injected into the Reviewer, Appeals, and Assistant prompts.
+// ---------------------------------------------------------------------------
+let CLAIMS_REFERENCE = "";
+for (const p of [
+  process.env.CLAIMS_REFERENCE_FILE,
+  "/etc/secrets/claims_reference.md",
+  path.join(__dirname, "claims_reference.md"),
+].filter(Boolean)) {
+  try {
+    if (fs.existsSync(p)) {
+      CLAIMS_REFERENCE = fs.readFileSync(p, "utf8");
+      console.log("Loaded claims practice reference from " + p + " (" + CLAIMS_REFERENCE.length + " chars)");
+      break;
+    }
+  } catch {}
+}
+if (!CLAIMS_REFERENCE) console.log("No claims practice reference file found.");
+
 // Claim-type rulebook: what the reviewer applies on top of the base prompt.
 // Note: ESP is OWS Claim Type 11 with Sub-Code ESP (Type 71 is competitive-make);
 // SPW is its own Type 21. Standard NVLW and ESP share code 11 but different rules,
@@ -425,6 +449,9 @@ Rules:
     : "") +
   (OWS_REFERENCE
     ? `\n\nYou ALSO have the dealership's distilled Ford OWS (Online Warranty System) Claiming reference below — the rules for how a claim must be coded and submitted in OWS. Use it to check claim-readiness: the causal part and its 2-char condition code, the customer concern code, required comments (3 Cs in the comment fields), standard vs actual time claiming, exception/self-approval codes, required attachments, sublet (OSP/OSL) entry, and the commodity-specific rules (battery tester codes, paint material, tires, etc.). When a finding is based on an OWS rule, cite the OWS section (e.g. "per OWS §4 causal part") so the advisor can look it up. Flag OWS-specific rejection triggers from its "Common Rejection / Return Triggers" list.\n\n=== FORD OWS CLAIMING REFERENCE ===\n` + OWS_REFERENCE
+    : "") +
+  (CLAIMS_REFERENCE
+    ? `\n\nYou ALSO have a Claims Practice reference distilled from this dealership's own real casework below: denial patterns actually encountered, documentation standards that survived audits, wording traps, and coding lessons learned the hard way. Use it to catch practical rejection risks the manuals don't spell out (e.g. wording that triggers denials, punch-time and PTS-history mismatches, prior-approval pitfalls). Where it conflicts with the Ford W&P or OWS references, the official references win. Items marked (verify) are experience-based and may have changed — frame findings from them as "verify against current W&P".\n\n=== CLAIMS PRACTICE REFERENCE (dealership casework) ===\n` + CLAIMS_REFERENCE
     : "");
 
 // ---------------------------------------------------------------------------
@@ -1083,7 +1110,7 @@ function requireOwner(req, res, next) {
 // guaranteed. Bump RUBRIC_VERSION whenever the scoring logic, weights, or
 // system prompt change so previously cached results are invalidated.
 // ---------------------------------------------------------------------------
-const RUBRIC_VERSION = "2026-07-16.12";
+const RUBRIC_VERSION = "2026-07-24.13";
 const REVIEW_CACHE_FILE = path.join(HISTORY_DIR, "review_cache.json");
 const REVIEW_CACHE_CAP = 3000;
 let REVIEW_CACHE = {};
@@ -1388,6 +1415,9 @@ Rules:
     : "") +
   (OWS_REFERENCE
     ? `\n\nYou also have the dealership's distilled Ford OWS Claiming reference below — cite its rules where the rejection concerns claim coding, causal part / condition code, comments, time claiming, exception codes, or sublet entry.\n\n=== FORD OWS CLAIMING REFERENCE ===\n` + OWS_REFERENCE
+    : "") +
+  (CLAIMS_REFERENCE
+    ? `\n\nYou also have a Claims Practice reference distilled from this dealership's own casework below — real denial patterns, appeal approaches that worked (and failed), escalation paths (WAT, PAC, Commitment Team, COPIS), and lessons learned. Draw on it for appeal strategy and framing, but never let it override the official W&P/OWS references, and never assert an experience-based rule as official policy — cite official sections for policy claims.\n\n=== CLAIMS PRACTICE REFERENCE (dealership casework) ===\n` + CLAIMS_REFERENCE
     : "");
 
 // --- Resilient upstream AI calls ---------------------------------------------
@@ -2736,6 +2766,7 @@ How to answer:
   if (FORD_REFERENCE) s += "\n\n=== FORD WARRANTY & POLICY REFERENCE ===\n" + FORD_REFERENCE;
   if (OWS_REFERENCE) s += "\n\n=== OWS CLAIMING REFERENCE ===\n" + OWS_REFERENCE;
   if (ESP_REFERENCE) s += "\n\n=== FORD/LINCOLN PROTECT (ESP) REFERENCE ===\n" + ESP_REFERENCE;
+  if (CLAIMS_REFERENCE) s += "\n\n=== CLAIMS PRACTICE REFERENCE (this dealership's real casework — experience-based; where it conflicts with the official references above, the official references win; treat items marked (verify) as needing confirmation) ===\n" + CLAIMS_REFERENCE;
   return s;
 }
 
